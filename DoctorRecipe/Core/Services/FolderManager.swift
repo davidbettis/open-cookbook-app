@@ -8,6 +8,27 @@
 import Foundation
 import SwiftUI
 
+/// Errors that can occur during folder management operations
+enum FolderError: LocalizedError {
+    case folderNotFound
+    case permissionDenied
+    case iCloudUnavailable
+    case invalidBookmark
+
+    var errorDescription: String? {
+        switch self {
+        case .folderNotFound:
+            return "The selected folder could not be found. It may have been deleted or moved."
+        case .permissionDenied:
+            return "Permission denied to access the folder. Please check your iCloud Drive settings."
+        case .iCloudUnavailable:
+            return "iCloud Drive is not available. Please enable iCloud in Settings."
+        case .invalidBookmark:
+            return "The saved folder reference is invalid. Please select a folder again."
+        }
+    }
+}
+
 /// Manages the user's selected iCloud Drive folder for recipe storage
 @Observable
 final class FolderManager {
@@ -66,22 +87,40 @@ final class FolderManager {
             return nil
         }
 
-        var isStale = false
-        let url = try URL(
-            resolvingBookmarkData: bookmarkData,
-            options: .withoutUI,
-            relativeTo: nil,
-            bookmarkDataIsStale: &isStale
-        )
+        do {
+            var isStale = false
+            let url = try URL(
+                resolvingBookmarkData: bookmarkData,
+                options: .withoutUI,
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            )
 
-        // If bookmark is stale, re-save to refresh it
-        if isStale {
-            try saveFolder(url)
+            // Verify the folder still exists
+            var isDirectory: ObjCBool = false
+            guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+                  isDirectory.boolValue else {
+                // Folder no longer exists, clear the bookmark
+                clearSavedFolder()
+                throw FolderError.folderNotFound
+            }
+
+            // If bookmark is stale, re-save to refresh it
+            if isStale {
+                try saveFolder(url)
+            }
+
+            self.selectedFolderURL = url
+            self.folderBookmark = bookmarkData
+            return url
+        } catch let error as FolderError {
+            // Re-throw our custom errors
+            throw error
+        } catch {
+            // Invalid bookmark data, clear it
+            clearSavedFolder()
+            throw FolderError.invalidBookmark
         }
-
-        self.selectedFolderURL = url
-        self.folderBookmark = bookmarkData
-        return url
     }
 
     /// Checks if a folder has been selected and saved
@@ -97,5 +136,11 @@ final class FolderManager {
         UserDefaults.standard.removeObject(forKey: "selectedFolderBookmark")
         selectedFolderURL = nil
         folderBookmark = nil
+    }
+
+    /// Checks if iCloud Drive is available
+    /// - Returns: True if iCloud is available and user is signed in
+    func checkiCloudAvailability() -> Bool {
+        return FileManager.default.ubiquityIdentityToken != nil
     }
 }
