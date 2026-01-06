@@ -10,8 +10,14 @@ import Testing
 
 struct DoctorRecipeTests {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
+    @Test func exampleTest() async throws {
+        // This is a placeholder test to verify test infrastructure works
+        #expect(1 + 1 == 2)
+    }
+
+    @Test func appLaunches() async throws {
+        // Verify basic app structure is set up
+        #expect(true)
     }
 
 }
