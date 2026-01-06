@@ -15,10 +15,9 @@ struct DoctorRecipeApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                // Check if iCloud is available
-                if !folderManager.checkiCloudAvailability() {
-                    CloudPermissionErrorView()
-                } else if folderManager.hasSelectedFolder() {
+                // For development: Allow local storage without iCloud
+                // Remove this check once iCloud is properly configured
+                if folderManager.hasSelectedFolder() {
                     // Main app with tabs
                     MainTabView()
                         .environment(folderManager)

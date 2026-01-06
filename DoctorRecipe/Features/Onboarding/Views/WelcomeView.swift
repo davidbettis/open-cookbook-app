@@ -24,7 +24,7 @@ struct WelcomeView: View {
                 .bold()
                 .multilineTextAlignment(.center)
 
-            Text("Store your recipes in RecipeMD format on iCloud Drive. Your data stays under your control.")
+            Text("Store your recipes in RecipeMD format. Choose a local folder or iCloud Drive. Your data stays under your control.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

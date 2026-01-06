@@ -23,9 +23,10 @@ struct FolderPicker: UIViewControllerRepresentable {
         picker.delegate = context.coordinator
         picker.allowsMultipleSelection = false
 
-        // Start in iCloud Drive if available
-        if let iCloudURL = FileManager.default.url(forUbiquityContainerIdentifier: nil) {
-            picker.directoryURL = iCloudURL
+        // Start in Documents directory (works locally without iCloud)
+        // User can still navigate to iCloud Drive if available
+        if let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+            picker.directoryURL = documentsURL
         }
 
         return picker
