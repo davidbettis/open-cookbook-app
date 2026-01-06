@@ -9,9 +9,27 @@ import SwiftUI
 
 @main
 struct DoctorRecipeApp: App {
+    @State private var folderManager = FolderManager()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            Group {
+                if folderManager.hasSelectedFolder() {
+                    // Main app - placeholder for now
+                    ContentView()
+                        .environment(folderManager)
+                } else {
+                    // Show onboarding if no folder selected
+                    OnboardingView(folderManager: folderManager) {
+                        // Force UI refresh after onboarding completes
+                        // The folderManager state change will trigger a re-render
+                    }
+                }
+            }
+            .onAppear {
+                // Load saved folder on launch
+                try? folderManager.loadSavedFolder()
+            }
         }
     }
 }
