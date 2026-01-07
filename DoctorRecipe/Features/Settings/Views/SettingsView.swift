@@ -12,6 +12,11 @@ struct SettingsView: View {
     @State private var showFolderPicker = false
     @State private var showChangeConfirmation = false
     @State private var selectedURL: URL?
+    @State private var isLoadingSamples = false
+    @State private var showSampleLoadError = false
+    @State private var sampleLoadError: Error?
+    @State private var samplesLoadedCount = 0
+    @State private var showSamplesSuccess = false
 
     var body: some View {
         NavigationStack {
@@ -39,6 +44,26 @@ struct SettingsView: View {
                     .foregroundStyle(.blue)
                 } header: {
                     Text("Storage")
+                }
+
+                Section {
+                    Button {
+                        loadSampleRecipes()
+                    } label: {
+                        HStack {
+                            if isLoadingSamples {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .padding(.trailing, 4)
+                            }
+                            Text("Load Sample Recipes")
+                        }
+                    }
+                    .disabled(isLoadingSamples)
+                } header: {
+                    Text("Testing")
+                } footer: {
+                    Text("Add 5 sample recipes in RecipeMD format to your selected folder for testing.")
                 }
 
                 Section {
@@ -77,6 +102,46 @@ struct SettingsView: View {
                     }
                 )
             }
+            .alert("Error Loading Samples", isPresented: $showSampleLoadError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                if let error = sampleLoadError {
+                    Text(error.localizedDescription)
+                }
+            }
+            .alert("Samples Loaded", isPresented: $showSamplesSuccess) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("\(samplesLoadedCount) sample recipes were added to your folder.")
+            }
+        }
+    }
+
+    // MARK: - Helper Methods
+
+    private func loadSampleRecipes() {
+        isLoadingSamples = true
+        defer { isLoadingSamples = false }
+
+        // Check if folder is selected
+        guard let selectedFolder = folderManager.selectedFolderURL else {
+            sampleLoadError = NSError(
+                domain: "SettingsView",
+                code: 1,
+                userInfo: [NSLocalizedDescriptionKey: "Please select a recipe folder first before loading sample recipes."]
+            )
+            showSampleLoadError = true
+            return
+        }
+
+        do {
+            // Copy sample recipes (fast operation for 5 small files)
+            let copiedFiles = try SampleRecipeLoader.copySampleRecipes(to: selectedFolder)
+            samplesLoadedCount = copiedFiles.count
+            showSamplesSuccess = true
+        } catch {
+            sampleLoadError = error
+            showSampleLoadError = true
         }
     }
 }

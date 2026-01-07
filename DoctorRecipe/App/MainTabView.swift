@@ -10,14 +10,11 @@ import SwiftUI
 struct MainTabView: View {
     var body: some View {
         TabView {
-            // Recipes tab - placeholder for now
-            NavigationStack {
-                ContentView()
-                    .navigationTitle("Recipes")
-            }
-            .tabItem {
-                Label("Recipes", systemImage: "book")
-            }
+            // Recipes tab
+            RecipeLibraryContainerView()
+                .tabItem {
+                    Label("Recipes", systemImage: "book")
+                }
 
             // Settings tab
             SettingsView()
