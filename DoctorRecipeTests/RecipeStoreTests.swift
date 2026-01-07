@@ -10,6 +10,7 @@ import Foundation
 @testable import DoctorRecipe
 
 @Suite("RecipeStore Tests")
+@MainActor
 struct RecipeStoreTests {
 
     // MARK: - Helper Methods
@@ -61,7 +62,7 @@ struct RecipeStoreTests {
         defer { cleanupTestDirectory(testDir) }
 
         let store = RecipeStore()
-        await store.loadRecipes(from: testDir)
+        store.loadRecipes(from: testDir)
 
         // Verify recipes were loaded
         #expect(store.recipes.count == 2)
@@ -84,7 +85,7 @@ struct RecipeStoreTests {
         defer { cleanupTestDirectory(testDir) }
 
         let store = RecipeStore()
-        await store.loadRecipes(from: testDir)
+        store.loadRecipes(from: testDir)
 
         #expect(store.recipes.isEmpty)
         #expect(store.parseErrors.isEmpty)
@@ -109,7 +110,7 @@ struct RecipeStoreTests {
         defer { cleanupTestDirectory(testDir) }
 
         let store = RecipeStore()
-        await store.loadRecipes(from: testDir)
+        store.loadRecipes(from: testDir)
 
         // Verify valid recipe was loaded
         #expect(store.recipes.count == 1)
@@ -135,7 +136,7 @@ struct RecipeStoreTests {
         defer { cleanupTestDirectory(testDir) }
 
         let store = RecipeStore()
-        await store.loadRecipes(from: testDir)
+        store.loadRecipes(from: testDir)
 
         #expect(store.recipes.count == 1)
 
@@ -149,7 +150,7 @@ struct RecipeStoreTests {
         try newRecipe.write(to: newFileURL, atomically: true, encoding: .utf8)
 
         // Refresh
-        await store.refreshRecipes()
+        store.refreshRecipes()
 
         // Verify both recipes are now loaded
         #expect(store.recipes.count == 2)
@@ -173,11 +174,11 @@ struct RecipeStoreTests {
         let store = RecipeStore()
 
         // First load
-        await store.loadRecipes(from: testDir)
+        store.loadRecipes(from: testDir)
         let firstLoad = store.recipes[0]
 
         // Second load without changes
-        await store.refreshRecipes()
+        store.refreshRecipes()
         let secondLoad = store.recipes[0]
 
         // Verify same recipe instance (from cache)
@@ -201,7 +202,7 @@ struct RecipeStoreTests {
         let store = RecipeStore()
 
         // First load
-        await store.loadRecipes(from: testDir)
+        store.loadRecipes(from: testDir)
         #expect(store.recipes[0].title == "Original Title")
 
         // Wait a bit to ensure modification date changes
@@ -217,7 +218,7 @@ struct RecipeStoreTests {
         try modifiedContent.write(to: fileURL, atomically: true, encoding: .utf8)
 
         // Refresh
-        await store.refreshRecipes()
+         store.refreshRecipes()
 
         // Verify new content was parsed
         #expect(store.recipes[0].title == "Modified Title")
@@ -240,7 +241,7 @@ struct RecipeStoreTests {
         defer { cleanupTestDirectory(testDir) }
 
         let store = RecipeStore()
-        await store.loadRecipes(from: testDir)
+        store.loadRecipes(from: testDir)
 
         #expect(!store.recipes.isEmpty)
 
@@ -273,7 +274,7 @@ struct RecipeStoreTests {
 
         // Start loading (run in task to capture loading state)
         let loadingTask = Task {
-            await store.loadRecipes(from: testDir)
+            store.loadRecipes(from: testDir)
         }
 
         // Loading state might be true briefly, but we can't reliably test this
