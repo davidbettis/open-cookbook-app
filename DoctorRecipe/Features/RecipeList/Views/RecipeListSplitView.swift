@@ -59,6 +59,9 @@ struct RecipeListSplitView: View {
                 await viewModel.loadRecipes(folder: folder)
             }
         }
+        .onChange(of: viewModel.recipeStore.recipes) { _, _ in
+            viewModel.syncSearchService()
+        }
     }
 
     // MARK: - Subviews
@@ -70,11 +73,61 @@ struct RecipeListSplitView: View {
                 // Show loading state on initial load
                 ProgressView("Loading recipes...")
                     .padding()
-            } else if viewModel.recipeStore.recipes.isEmpty {
-                // Show empty state
+            } else if viewModel.recipeStore.recipes.isEmpty && !viewModel.searchService.hasActiveFilters {
+                // Show empty state (no recipes at all)
                 RecipeListEmptyState()
             } else {
-                // Show recipe list
+                // Show recipe list with search/filter
+                sidebarWithSearch
+            }
+        }
+    }
+
+    /// Sidebar with search bar and tag filter
+    private var sidebarWithSearch: some View {
+        VStack(spacing: 0) {
+            // Search bar
+            RecipeSearchBar(
+                text: Binding(
+                    get: { viewModel.searchService.searchText },
+                    set: { viewModel.searchService.searchText = $0 }
+                ),
+                onClear: { viewModel.searchService.clearSearch() }
+            )
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+
+            // Tag filter bar (only show if there are tags)
+            if !viewModel.searchService.availableTags.isEmpty {
+                TagFilterBar(
+                    tags: viewModel.searchService.availableTags,
+                    selectedTags: viewModel.searchService.selectedTags,
+                    onTagTap: { viewModel.searchService.toggleTag($0) },
+                    onClearAll: { viewModel.searchService.clearTagFilters() }
+                )
+                .padding(.top, 8)
+            }
+
+            // Result count (when filtering)
+            if viewModel.searchService.hasActiveFilters {
+                HStack {
+                    Text(viewModel.searchService.resultCountMessage)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Clear All") {
+                        viewModel.searchService.clearAllFilters()
+                    }
+                    .font(.subheadline)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+            }
+
+            // Recipe list or no results
+            if viewModel.displayedRecipes.isEmpty && viewModel.searchService.hasActiveFilters {
+                noResultsView
+            } else {
                 recipeList
             }
         }
@@ -83,7 +136,7 @@ struct RecipeListSplitView: View {
     private var recipeList: some View {
         List(selection: $selectedRecipe) {
             // Show successfully parsed recipes
-            ForEach(viewModel.recipeStore.recipes) { recipe in
+            ForEach(viewModel.displayedRecipes) { recipe in
                 Button {
                     selectedRecipe = recipe
                 } label: {
@@ -98,24 +151,40 @@ struct RecipeListSplitView: View {
                 )
             }
 
-            // Show parse errors
-            ForEach(Array(viewModel.recipeStore.parseErrors.keys.sorted(by: { $0.lastPathComponent < $1.lastPathComponent })), id: \.self) { url in
-                if let error = viewModel.recipeStore.parseErrors[url] {
-                    Button {
-                        selectedError = (url, error)
-                        showErrorAlert = true
-                    } label: {
-                        RecipeErrorCard(fileURL: url, error: error)
+            // Show parse errors (only when not filtering)
+            if !viewModel.searchService.hasActiveFilters {
+                ForEach(Array(viewModel.recipeStore.parseErrors.keys.sorted(by: { $0.lastPathComponent < $1.lastPathComponent })), id: \.self) { url in
+                    if let error = viewModel.recipeStore.parseErrors[url] {
+                        Button {
+                            selectedError = (url, error)
+                            showErrorAlert = true
+                        } label: {
+                            RecipeErrorCard(fileURL: url, error: error)
+                        }
+                        .buttonStyle(.plain)
+                        .listRowSeparator(.hidden)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     }
-                    .buttonStyle(.plain)
-                    .listRowSeparator(.hidden)
-                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                 }
             }
         }
         .listStyle(.plain)
         .refreshable {
             await viewModel.refresh()
+        }
+    }
+
+    /// No results view when search/filter returns empty
+    private var noResultsView: some View {
+        ContentUnavailableView {
+            Label("No Recipes Found", systemImage: "magnifyingglass")
+        } description: {
+            Text("No recipes match your search")
+        } actions: {
+            Button("Clear Filters") {
+                viewModel.searchService.clearAllFilters()
+            }
+            .buttonStyle(.borderedProminent)
         }
     }
 
@@ -189,25 +258,28 @@ struct RecipeDetailPlaceholder: View {
 // MARK: - Previews
 
 #Preview("With Recipes") {
-    @Previewable @State var store: RecipeStore = {
+    let store: RecipeStore = {
         let s = RecipeStore()
         s.recipes = [
             Recipe(
                 filePath: URL(fileURLWithPath: "/tmp/cookies.md"),
                 title: "Chocolate Chip Cookies",
                 description: "Classic homemade cookies",
-                tags: ["dessert", "baking"]
+                tags: ["dessert", "baking"],
+                ingredients: [Ingredient(name: "flour"), Ingredient(name: "sugar")]
             ),
             Recipe(
                 filePath: URL(fileURLWithPath: "/tmp/pasta.md"),
                 title: "Pasta Carbonara",
                 description: "Traditional Italian pasta dish",
-                tags: ["dinner", "italian"]
+                tags: ["dinner", "italian", "quick"],
+                ingredients: [Ingredient(name: "pasta"), Ingredient(name: "eggs")]
             ),
             Recipe(
                 filePath: URL(fileURLWithPath: "/tmp/salad.md"),
                 title: "Caesar Salad",
-                tags: ["lunch", "salad"]
+                tags: ["lunch", "salad", "quick"],
+                ingredients: [Ingredient(name: "lettuce"), Ingredient(name: "croutons")]
             )
         ]
         return s
