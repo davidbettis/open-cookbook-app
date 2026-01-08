@@ -63,6 +63,11 @@ struct RecipeListView: View {
     @State private var viewModel: RecipeListViewModel
     @State private var selectedError: (URL, Error)?
     @State private var showErrorAlert = false
+    @State private var showAddRecipe = false
+    @State private var recipeToDelete: Recipe?
+    @State private var showDeleteConfirmation = false
+    @State private var deleteError: Error?
+    @State private var showDeleteError = false
 
     // MARK: - Initialization
 
@@ -91,7 +96,7 @@ struct RecipeListView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        // TODO: Add recipe action (F005)
+                        showAddRecipe = true
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -99,7 +104,17 @@ struct RecipeListView: View {
                 }
             }
             .navigationDestination(for: Recipe.self) { recipe in
-                RecipeDetailView(recipe: recipe)
+                RecipeDetailView(recipe: recipe, recipeStore: viewModel.recipeStore)
+            }
+            .sheet(isPresented: $showAddRecipe) {
+                RecipeFormView(
+                    viewModel: RecipeFormViewModel(mode: .add),
+                    recipeStore: viewModel.recipeStore,
+                    onSave: { _ in
+                        // Recipe already added to store, just sync search
+                        viewModel.syncSearchService()
+                    }
+                )
             }
             .alert("Parse Error", isPresented: $showErrorAlert, presenting: selectedError) { _ in
                 Button("OK") {
@@ -107,6 +122,35 @@ struct RecipeListView: View {
                 }
             } message: { error in
                 Text(error.1.localizedDescription)
+            }
+            .confirmationDialog(
+                "Delete Recipe?",
+                isPresented: $showDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    if let recipe = recipeToDelete {
+                        Task {
+                            await deleteRecipe(recipe)
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    recipeToDelete = nil
+                }
+            } message: {
+                if let recipe = recipeToDelete {
+                    Text("Are you sure you want to delete \"\(recipe.title)\"? This action cannot be undone.")
+                }
+            }
+            .alert("Error Deleting Recipe", isPresented: $showDeleteError) {
+                Button("OK") {
+                    deleteError = nil
+                }
+            } message: {
+                if let error = deleteError {
+                    Text(error.localizedDescription)
+                }
             }
             .task {
                 // Load recipes on appear
@@ -183,6 +227,14 @@ struct RecipeListView: View {
                 .buttonStyle(.plain)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) {
+                        recipeToDelete = recipe
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
             }
 
             // Show parse errors (only when not filtering)
@@ -205,6 +257,20 @@ struct RecipeListView: View {
         .listStyle(.plain)
         .refreshable {
             await viewModel.refresh()
+        }
+    }
+
+    // MARK: - Actions
+
+    /// Delete a recipe
+    private func deleteRecipe(_ recipe: Recipe) async {
+        do {
+            try await viewModel.recipeStore.deleteRecipe(recipe)
+            recipeToDelete = nil
+            viewModel.syncSearchService()
+        } catch {
+            deleteError = error
+            showDeleteError = true
         }
     }
 

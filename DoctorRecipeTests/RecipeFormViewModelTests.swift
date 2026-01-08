@@ -1,0 +1,247 @@
+//
+//  RecipeFormViewModelTests.swift
+//  DoctorRecipeTests
+//
+//  Tests for RecipeFormViewModel
+//
+
+import Foundation
+import Testing
+@testable import DoctorRecipe
+
+@MainActor
+struct RecipeFormViewModelTests {
+
+    // MARK: - Initialization Tests
+
+    @Test("Initializes with add mode defaults")
+    func initializesWithAddModeDefaults() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+
+        #expect(viewModel.title == "")
+        #expect(viewModel.descriptionText == "")
+        #expect(viewModel.tagsText == "")
+        #expect(viewModel.yieldsText == "")
+        #expect(viewModel.instructions == "")
+        #expect(viewModel.ingredients.count == 1)
+        #expect(viewModel.mode == .add)
+        #expect(viewModel.navigationTitle == "New Recipe")
+        #expect(viewModel.saveButtonText == "Save")
+    }
+
+    @Test("Initializes with edit mode and populates fields")
+    func initializesWithEditMode() {
+        let recipe = Recipe(
+            filePath: URL(fileURLWithPath: "/tmp/test.md"),
+            title: "Test Recipe",
+            description: "Test description",
+            tags: ["tag1", "tag2"],
+            yields: ["serves 4"],
+            ingredients: [
+                Ingredient(quantity: "1", unit: "cup", name: "flour")
+            ],
+            instructions: "Test instructions"
+        )
+
+        let viewModel = RecipeFormViewModel(mode: .edit(recipe))
+
+        #expect(viewModel.title == "Test Recipe")
+        #expect(viewModel.descriptionText == "Test description")
+        #expect(viewModel.tagsText == "tag1, tag2")
+        #expect(viewModel.yieldsText == "serves 4")
+        #expect(viewModel.instructions == "Test instructions")
+        #expect(viewModel.navigationTitle == "Edit Recipe")
+        #expect(viewModel.saveButtonText == "Save Changes")
+    }
+
+    // MARK: - Validation Tests
+
+    @Test("Validates successfully with minimal data")
+    func validatesWithMinimalData() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "Test Recipe"
+        viewModel.ingredients = [EditableIngredient(amount: "", name: "flour")]
+
+        let isValid = viewModel.validate()
+
+        #expect(isValid == true)
+        #expect(viewModel.validationErrors.isEmpty)
+    }
+
+    @Test("Fails validation with empty title")
+    func failsValidationWithEmptyTitle() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = ""
+        viewModel.ingredients = [EditableIngredient(amount: "", name: "flour")]
+
+        let isValid = viewModel.validate()
+
+        #expect(isValid == false)
+        #expect(viewModel.titleHasError == true)
+        #expect(viewModel.validationErrors.contains { $0.field == "title" })
+    }
+
+    @Test("Fails validation with whitespace-only title")
+    func failsValidationWithWhitespaceTitle() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "   "
+        viewModel.ingredients = [EditableIngredient(amount: "", name: "flour")]
+
+        let isValid = viewModel.validate()
+
+        #expect(isValid == false)
+        #expect(viewModel.titleHasError == true)
+    }
+
+    @Test("Fails validation with title over 200 characters")
+    func failsValidationWithLongTitle() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = String(repeating: "a", count: 201)
+        viewModel.ingredients = [EditableIngredient(amount: "", name: "flour")]
+
+        let isValid = viewModel.validate()
+
+        #expect(isValid == false)
+        #expect(viewModel.titleHasError == true)
+    }
+
+    @Test("Fails validation with no ingredients")
+    func failsValidationWithNoIngredients() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "Test Recipe"
+        viewModel.ingredients = []
+
+        let isValid = viewModel.validate()
+
+        #expect(isValid == false)
+        #expect(viewModel.ingredientsHasError == true)
+    }
+
+    @Test("Fails validation with only empty ingredients")
+    func failsValidationWithEmptyIngredients() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "Test Recipe"
+        viewModel.ingredients = [
+            EditableIngredient(amount: "1 cup", name: ""),
+            EditableIngredient(amount: "", name: "   ")
+        ]
+
+        let isValid = viewModel.validate()
+
+        #expect(isValid == false)
+        #expect(viewModel.ingredientsHasError == true)
+    }
+
+    // MARK: - Change Detection Tests
+
+    @Test("Detects no changes after initialization")
+    func detectsNoChangesAfterInit() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+
+        #expect(viewModel.hasUnsavedChanges == false)
+    }
+
+    @Test("Detects title change")
+    func detectsTitleChange() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "New Title"
+
+        #expect(viewModel.hasUnsavedChanges == true)
+    }
+
+    @Test("Detects ingredient change")
+    func detectsIngredientChange() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.ingredients[0].name = "flour"
+
+        #expect(viewModel.hasUnsavedChanges == true)
+    }
+
+    // MARK: - Ingredient Management Tests
+
+    @Test("Adds ingredient")
+    func addsIngredient() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        let initialCount = viewModel.ingredients.count
+
+        viewModel.addIngredient()
+
+        #expect(viewModel.ingredients.count == initialCount + 1)
+    }
+
+    @Test("Removes ingredient")
+    func removesIngredient() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.addIngredient()
+        viewModel.addIngredient()
+        let initialCount = viewModel.ingredients.count
+
+        viewModel.removeIngredient(at: IndexSet(integer: 0))
+
+        #expect(viewModel.ingredients.count == initialCount - 1)
+    }
+
+    @Test("Keeps at least one ingredient after removal")
+    func keepsOneIngredientAfterRemoval() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        #expect(viewModel.ingredients.count == 1)
+
+        viewModel.removeIngredient(at: IndexSet(integer: 0))
+
+        #expect(viewModel.ingredients.count == 1)
+    }
+
+    // MARK: - Editable Ingredient Tests
+
+    @Test("Converts ingredient to model")
+    func convertsIngredientToModel() {
+        let editable = EditableIngredient(amount: "2 cups", name: "flour")
+
+        let ingredient = editable.toIngredient()
+
+        #expect(ingredient.quantity == "2")
+        #expect(ingredient.unit == "cups")
+        #expect(ingredient.name == "flour")
+    }
+
+    @Test("Handles ingredient with quantity only")
+    func handlesIngredientWithQuantityOnly() {
+        let editable = EditableIngredient(amount: "2", name: "eggs")
+
+        let ingredient = editable.toIngredient()
+
+        #expect(ingredient.quantity == "2")
+        #expect(ingredient.unit == nil)
+        #expect(ingredient.name == "eggs")
+    }
+
+    @Test("Handles ingredient with no amount")
+    func handlesIngredientWithNoAmount() {
+        let editable = EditableIngredient(amount: "", name: "salt")
+
+        let ingredient = editable.toIngredient()
+
+        #expect(ingredient.quantity == nil)
+        #expect(ingredient.unit == nil)
+        #expect(ingredient.name == "salt")
+    }
+
+    @Test("Creates editable from ingredient model")
+    func createsEditableFromModel() {
+        let ingredient = Ingredient(quantity: "1", unit: "cup", name: "sugar")
+
+        let editable = EditableIngredient(from: ingredient)
+
+        #expect(editable.amount == "1 cup")
+        #expect(editable.name == "sugar")
+    }
+
+    @Test("Validates editable ingredient")
+    func validatesEditableIngredient() {
+        let valid = EditableIngredient(amount: "1 cup", name: "flour")
+        let invalid = EditableIngredient(amount: "1 cup", name: "")
+
+        #expect(valid.isValid == true)
+        #expect(invalid.isValid == false)
+    }
+}

@@ -10,9 +10,18 @@ import SwiftUI
 
 struct RecipeDetailView: View {
     let recipe: Recipe
+    var recipeStore: RecipeStore?
 
+    @Environment(\.dismiss) private var dismiss
     @State private var markdownContent: String?
     @State private var loadError: Error?
+    @State private var currentRecipe: Recipe?
+    @State private var showDeleteConfirmation = false
+    @State private var deleteError: Error?
+    @State private var showDeleteError = false
+    @State private var recipeToEdit: Recipe?
+
+    private let parser = RecipeMDParser()
 
     var body: some View {
         ScrollView {
@@ -42,16 +51,68 @@ struct RecipeDetailView: View {
                     .accessibilityLabel("Share Recipe")
                 }
 
-                // Edit button (placeholder for F006)
-                Button {
-                    // TODO: Navigate to edit view (F006)
-                } label: {
-                    Image(systemName: "pencil")
+                // Edit button
+                if recipeStore != nil {
+                    Button {
+                        loadFullRecipeAndEdit()
+                    } label: {
+                        Image(systemName: "pencil")
+                    }
+                    .accessibilityLabel("Edit Recipe")
                 }
-                .accessibilityLabel("Edit Recipe")
+
+                // More menu (with delete)
+                if recipeStore != nil {
+                    Menu {
+                        Button(role: .destructive) {
+                            showDeleteConfirmation = true
+                        } label: {
+                            Label("Delete Recipe", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .accessibilityLabel("More options")
+                }
+            }
+        }
+        .sheet(item: $recipeToEdit) { fullRecipe in
+            if let store = recipeStore {
+                RecipeFormView(
+                    viewModel: RecipeFormViewModel(mode: .edit(fullRecipe)),
+                    recipeStore: store,
+                    onSave: { savedRecipe in
+                        currentRecipe = savedRecipe
+                        Task {
+                            await loadRecipeContent()
+                        }
+                    }
+                )
+            }
+        }
+        .confirmationDialog(
+            "Delete Recipe?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    await deleteRecipe()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Are you sure you want to delete \"\(recipe.title)\"? This action cannot be undone.")
+        }
+        .alert("Error Deleting Recipe", isPresented: $showDeleteError) {
+            Button("OK") {}
+        } message: {
+            if let error = deleteError {
+                Text(error.localizedDescription)
             }
         }
         .task {
+            currentRecipe = recipe
             await loadRecipeContent()
         }
     }
@@ -61,14 +122,15 @@ struct RecipeDetailView: View {
     private func loadRecipeContent() async {
         do {
             // Start accessing security-scoped resource if needed
-            let didStartAccess = recipe.filePath.startAccessingSecurityScopedResource()
+            let fileToLoad = currentRecipe?.filePath ?? recipe.filePath
+            let didStartAccess = fileToLoad.startAccessingSecurityScopedResource()
             defer {
                 if didStartAccess {
-                    recipe.filePath.stopAccessingSecurityScopedResource()
+                    fileToLoad.stopAccessingSecurityScopedResource()
                 }
             }
 
-            let data = try Data(contentsOf: recipe.filePath)
+            let data = try Data(contentsOf: fileToLoad)
             guard let content = String(data: data, encoding: .utf8) else {
                 throw RecipeParseError.encodingError
             }
@@ -79,6 +141,46 @@ struct RecipeDetailView: View {
         } catch {
             await MainActor.run {
                 self.loadError = error
+            }
+        }
+    }
+
+    // MARK: - Edit
+
+    private func loadFullRecipeAndEdit() {
+        let fileURL = currentRecipe?.filePath ?? recipe.filePath
+
+        // Access security-scoped resource
+        let didStartAccess = fileURL.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccess {
+                fileURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            // Parse full recipe and set it - this triggers sheet presentation
+            recipeToEdit = try parser.parseFullRecipe(from: fileURL)
+        } catch {
+            // Fall back to partial recipe if full parse fails
+            recipeToEdit = currentRecipe ?? recipe
+        }
+    }
+
+    // MARK: - Delete
+
+    private func deleteRecipe() async {
+        guard let store = recipeStore else { return }
+
+        do {
+            try await store.deleteRecipe(currentRecipe ?? recipe)
+            await MainActor.run {
+                dismiss()
+            }
+        } catch {
+            await MainActor.run {
+                deleteError = error
+                showDeleteError = true
             }
         }
     }
