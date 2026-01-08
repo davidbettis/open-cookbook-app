@@ -25,7 +25,7 @@ final class DoctorRecipeUITests: XCTestCase {
         app.launch()
 
         // Verify "Hello, world!" appears
-        XCTAssertTrue(app.staticTexts["Hello, world!"].exists)
+        XCTAssertTrue(app.staticTexts["Welcome to DoctorRecipe"].exists)
     }
 
     @MainActor
