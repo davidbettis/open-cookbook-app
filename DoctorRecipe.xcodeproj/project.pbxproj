@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A2F047012F0F30A300E180A7 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = A2MARKDOWN022F0DC33000EC64 /* MarkdownUI */; };
+		A2F047022F0F30A300E180A7 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = A2MARKDOWN032F0DC33000EC64 /* MarkdownUI */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		A20DCD942F0DC33000EC64C2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +57,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A2F047012F0F30A300E180A7 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -59,6 +65,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A2F047022F0F30A300E180A7 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +119,7 @@
 			);
 			name = DoctorRecipe;
 			packageProductDependencies = (
+				A2MARKDOWN022F0DC33000EC64 /* MarkdownUI */,
 			);
 			productName = DoctorRecipe;
 			productReference = A20DCD862F0DC32F00EC64C2 /* DoctorRecipe.app */;
@@ -135,6 +143,7 @@
 			);
 			name = DoctorRecipeTests;
 			packageProductDependencies = (
+				A2MARKDOWN032F0DC33000EC64 /* MarkdownUI */,
 			);
 			productName = DoctorRecipeTests;
 			productReference = A20DCD932F0DC33000EC64C2 /* DoctorRecipeTests.xctest */;
@@ -194,6 +203,9 @@
 				Base,
 			);
 			mainGroup = A20DCD7D2F0DC32F00EC64C2;
+			packageReferences = (
+				A2MARKDOWN012F0DC33000EC64 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A20DCD872F0DC32F00EC64C2 /* Products */;
 			projectDirPath = "";
@@ -561,6 +573,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A2MARKDOWN012F0DC33000EC64 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/gonzalezreal/swift-markdown-ui";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.4.1;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A2MARKDOWN022F0DC33000EC64 /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A2MARKDOWN012F0DC33000EC64 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
+		};
+		A2MARKDOWN032F0DC33000EC64 /* MarkdownUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A2MARKDOWN012F0DC33000EC64 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
+			productName = MarkdownUI;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A20DCD7E2F0DC32F00EC64C2 /* Project object */;
 }

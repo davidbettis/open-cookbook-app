@@ -122,8 +122,7 @@ struct RecipeListSplitView: View {
     @ViewBuilder
     private var detailContent: some View {
         if let recipe = selectedRecipe {
-            // Placeholder for recipe detail view (F004)
-            RecipeDetailPlaceholder(recipe: recipe)
+            RecipeDetailView(recipe: recipe)
         } else {
             // No selection
             ContentUnavailableView(

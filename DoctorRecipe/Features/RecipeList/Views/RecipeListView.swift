@@ -80,6 +80,9 @@ struct RecipeListView: View {
                     .accessibilityLabel("Add Recipe")
                 }
             }
+            .navigationDestination(for: Recipe.self) { recipe in
+                RecipeDetailView(recipe: recipe)
+            }
             .alert("Parse Error", isPresented: $showErrorAlert, presenting: selectedError) { _ in
                 Button("OK") {
                     selectedError = nil
@@ -102,9 +105,7 @@ struct RecipeListView: View {
         List {
             // Show successfully parsed recipes
             ForEach(viewModel.recipeStore.recipes) { recipe in
-                Button {
-                    // TODO: Navigate to detail view (F004)
-                } label: {
+                NavigationLink(value: recipe) {
                     RecipeCard(recipe: recipe)
                 }
                 .buttonStyle(.plain)
