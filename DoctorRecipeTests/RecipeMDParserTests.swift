@@ -9,10 +9,11 @@ import Testing
 import Foundation
 @testable import DoctorRecipe
 
-@Suite("RecipeMD Parser Tests")
+@Suite("RecipeMD Parser Tests", .serialized)
 struct RecipeMDParserTests {
 
-    let parser = RecipeMDParser()
+    // Create parser as computed property so each test gets a fresh instance
+    var parser: RecipeMDParser { RecipeMDParser() }
 
     // MARK: - Title Parsing Tests
 
@@ -221,9 +222,9 @@ struct RecipeMDParserTests {
 
     @Test("Parse complete valid RecipeMD file")
     func parseCompleteRecipe() async throws {
-        // Create temporary file
+        // Create temporary file with unique name to avoid parallel test conflicts
         let tempDir = FileManager.default.temporaryDirectory
-        let fileURL = tempDir.appendingPathComponent("test_recipe.md")
+        let fileURL = tempDir.appendingPathComponent("test_recipe_\(UUID().uuidString).md")
 
         let content = """
         # Chocolate Chip Cookies
@@ -262,7 +263,7 @@ struct RecipeMDParserTests {
     @Test("Handle minimal recipe with title only")
     func parseMinimalRecipe() async throws {
         let tempDir = FileManager.default.temporaryDirectory
-        let fileURL = tempDir.appendingPathComponent("minimal_recipe.md")
+        let fileURL = tempDir.appendingPathComponent("minimal_recipe_\(UUID().uuidString).md")
 
         let content = """
         # Simple Recipe
@@ -283,7 +284,7 @@ struct RecipeMDParserTests {
     @Test("Throw error for missing title")
     func parseRecipeWithoutTitle() async throws {
         let tempDir = FileManager.default.temporaryDirectory
-        let fileURL = tempDir.appendingPathComponent("no_title.md")
+        let fileURL = tempDir.appendingPathComponent("no_title_\(UUID().uuidString).md")
 
         let content = """
         This is some content without a title.
@@ -312,7 +313,7 @@ struct RecipeMDParserTests {
     @Test("Handle malformed markdown gracefully")
     func parseMalformedMarkdown() async throws {
         let tempDir = FileManager.default.temporaryDirectory
-        let fileURL = tempDir.appendingPathComponent("malformed.md")
+        let fileURL = tempDir.appendingPathComponent("malformed_\(UUID().uuidString).md")
 
         let content = """
         # Valid Title

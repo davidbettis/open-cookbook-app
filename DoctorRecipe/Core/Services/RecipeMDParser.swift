@@ -13,8 +13,7 @@ import Foundation
 /// - Tags (from italic text)
 /// - Yields (from bold text)
 /// - Description (first paragraph)
-@Observable
-class RecipeMDParser {
+final class RecipeMDParser {
 
     // MARK: - Public Methods
 
@@ -92,8 +91,9 @@ class RecipeMDParser {
                 break
             }
 
-            // Look for italic text: *tags*
-            if trimmed.hasPrefix("*") && trimmed.hasSuffix("*") && trimmed.count > 2 {
+            // Look for italic text: *tags* (but not bold **text**)
+            if trimmed.hasPrefix("*") && trimmed.hasSuffix("*") && trimmed.count > 2 &&
+               !trimmed.hasPrefix("**") {
                 let tagText = trimmed.dropFirst().dropLast()
                 let parsedTags = tagText.split(separator: ",").map { tag in
                     tag.trimmingCharacters(in: .whitespaces)

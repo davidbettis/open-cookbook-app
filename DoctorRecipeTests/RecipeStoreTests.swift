@@ -9,7 +9,7 @@ import Testing
 import Foundation
 @testable import DoctorRecipe
 
-@Suite("RecipeStore Tests")
+@Suite("RecipeStore Tests", .serialized)
 @MainActor
 struct RecipeStoreTests {
 
@@ -59,9 +59,12 @@ struct RecipeStoreTests {
         ]
 
         let testDir = createTestDirectory(with: recipes)
-        defer { cleanupTestDirectory(testDir) }
-
         let store = RecipeStore()
+        defer {
+            store.reset()
+            cleanupTestDirectory(testDir)
+        }
+
         store.loadRecipes(from: testDir)
 
         // Verify recipes were loaded
@@ -82,9 +85,12 @@ struct RecipeStoreTests {
     @Test("Handle empty folder")
     func handleEmptyFolder() async throws {
         let testDir = createTestDirectory(with: [:])
-        defer { cleanupTestDirectory(testDir) }
-
         let store = RecipeStore()
+        defer {
+            store.reset()
+            cleanupTestDirectory(testDir)
+        }
+
         store.loadRecipes(from: testDir)
 
         #expect(store.recipes.isEmpty)
@@ -107,9 +113,12 @@ struct RecipeStoreTests {
         ]
 
         let testDir = createTestDirectory(with: recipes)
-        defer { cleanupTestDirectory(testDir) }
-
         let store = RecipeStore()
+        defer {
+            store.reset()
+            cleanupTestDirectory(testDir)
+        }
+
         store.loadRecipes(from: testDir)
 
         // Verify valid recipe was loaded
@@ -133,9 +142,12 @@ struct RecipeStoreTests {
         ]
 
         let testDir = createTestDirectory(with: recipes)
-        defer { cleanupTestDirectory(testDir) }
-
         let store = RecipeStore()
+        defer {
+            store.reset()
+            cleanupTestDirectory(testDir)
+        }
+
         store.loadRecipes(from: testDir)
 
         #expect(store.recipes.count == 1)
@@ -169,9 +181,11 @@ struct RecipeStoreTests {
         ]
 
         let testDir = createTestDirectory(with: recipes)
-        defer { cleanupTestDirectory(testDir) }
-
         let store = RecipeStore()
+        defer {
+            store.reset()
+            cleanupTestDirectory(testDir)
+        }
 
         // First load
         store.loadRecipes(from: testDir)
@@ -197,9 +211,11 @@ struct RecipeStoreTests {
         ]
 
         let testDir = createTestDirectory(with: recipes)
-        defer { cleanupTestDirectory(testDir) }
-
         let store = RecipeStore()
+        defer {
+            store.reset()
+            cleanupTestDirectory(testDir)
+        }
 
         // First load
         store.loadRecipes(from: testDir)
@@ -238,9 +254,12 @@ struct RecipeStoreTests {
         ]
 
         let testDir = createTestDirectory(with: recipes)
-        defer { cleanupTestDirectory(testDir) }
-
         let store = RecipeStore()
+        defer {
+            store.reset()
+            cleanupTestDirectory(testDir)
+        }
+
         store.loadRecipes(from: testDir)
 
         #expect(!store.recipes.isEmpty)
@@ -266,9 +285,11 @@ struct RecipeStoreTests {
         ]
 
         let testDir = createTestDirectory(with: recipes)
-        defer { cleanupTestDirectory(testDir) }
-
         let store = RecipeStore()
+        defer {
+            store.reset()
+            cleanupTestDirectory(testDir)
+        }
 
         #expect(store.isLoading == false)
 
