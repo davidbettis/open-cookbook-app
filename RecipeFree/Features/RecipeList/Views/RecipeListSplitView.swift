@@ -18,6 +18,7 @@ struct RecipeListSplitView: View {
     @State private var selectedRecipeFile: RecipeFile?
     @State private var selectedError: (URL, Error)?
     @State private var showErrorAlert = false
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     // MARK: - Initialization
 
@@ -28,7 +29,7 @@ struct RecipeListSplitView: View {
     // MARK: - Body
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             // Sidebar - Recipe List
             sidebarContent
                 .navigationTitle("Recipes")
