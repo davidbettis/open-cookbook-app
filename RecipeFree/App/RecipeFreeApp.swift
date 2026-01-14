@@ -15,18 +15,12 @@ struct RecipeFreeApp: App {
     var body: some Scene {
         WindowGroup {
             Group {
-                // For development: Allow local storage without iCloud
-                // Remove this check once iCloud is properly configured
-                if folderManager.hasSelectedFolder() {
+                if folderManager.selectedFolderURL != nil {
                     // Main app with tabs
                     MainTabView()
                         .environment(folderManager)
                 } else {
-                    // Show onboarding if no folder selected
-                    OnboardingView(folderManager: folderManager) {
-                        // Force UI refresh after onboarding completes
-                        // The folderManager state change will trigger a re-render
-                    }
+                    OnboardingView(folderManager: folderManager) { }
                 }
             }
             .onAppear {
