@@ -11,11 +11,12 @@ import SwiftUI
 /// Renders ingredient groups as a styled list matching the MarkdownUI recipe theme
 struct IngredientsListView: View {
     let ingredientGroups: [IngredientGroup]
+    var portionMultiplier: Double = 1.0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             ForEach(Array(ingredientGroups.enumerated()), id: \.offset) { _, group in
-                IngredientGroupView(group: group)
+                IngredientGroupView(group: group, portionMultiplier: portionMultiplier)
             }
         }
     }
@@ -26,6 +27,7 @@ struct IngredientsListView: View {
 /// Renders a single ingredient group with optional title
 private struct IngredientGroupView: View {
     let group: IngredientGroup
+    var portionMultiplier: Double = 1.0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -40,7 +42,7 @@ private struct IngredientGroupView: View {
 
             // Ingredients in this group
             ForEach(Array(group.ingredients.enumerated()), id: \.offset) { _, ingredient in
-                IngredientRowDisplayView(ingredient: ingredient)
+                IngredientRowDisplayView(ingredient: ingredient, portionMultiplier: portionMultiplier)
             }
         }
     }
@@ -51,6 +53,7 @@ private struct IngredientGroupView: View {
 /// Displays a single ingredient with amount and name in uniform format
 private struct IngredientRowDisplayView: View {
     let ingredient: Ingredient
+    var portionMultiplier: Double = 1.0
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -72,7 +75,8 @@ private struct IngredientRowDisplayView: View {
 
     private var displayText: String {
         if let amount = ingredient.amount {
-            return "\(amount.formatted) \(ingredient.name)"
+            let scaledAmount = amount.formattedScaled(by: portionMultiplier)
+            return "\(scaledAmount) \(ingredient.name)"
         }
         return ingredient.name
     }

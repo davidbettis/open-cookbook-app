@@ -17,14 +17,21 @@ struct RecipeDetailContent: View {
     let markdownContent: String
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var selectedPortion: PortionOption = .whole
 
     var body: some View {
-        if horizontalSizeClass == .regular {
-            // iPad: Header + Split content
-            iPadLayout
-        } else {
-            // iPhone: Full markdown in ScrollView (existing behavior)
-            iPhoneLayout
+        Group {
+            if horizontalSizeClass == .regular {
+                // iPad: Header + Split content
+                iPadLayout
+            } else {
+                // iPhone: Structured layout with portion scaling
+                iPhoneLayout
+            }
+        }
+        .onChange(of: recipeFile.id) { _, _ in
+            // Reset portion to whole when navigating to a different recipe
+            selectedPortion = .whole
         }
     }
 
@@ -32,22 +39,24 @@ struct RecipeDetailContent: View {
 
     private var iPadLayout: some View {
         VStack(spacing: 0) {
-            // Full-width header
+            // Full-width header with scaled yields
             RecipeHeaderView(
                 title: recipeFile.title,
                 description: recipeFile.description,
                 tags: recipeFile.tags,
-                yield: recipeFile.yield
+                yield: recipeFile.yield,
+                portionMultiplier: selectedPortion.multiplier
             )
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Divider()
 
-            // Split ingredients/instructions
+            // Split ingredients/instructions with portion selector
             RecipeDetailSplitContent(
                 ingredientGroups: recipeFile.ingredientGroups,
-                instructions: recipeFile.instructions
+                instructions: recipeFile.instructions,
+                selectedPortion: $selectedPortion
             )
         }
     }
@@ -55,9 +64,40 @@ struct RecipeDetailContent: View {
     // MARK: - iPhone Layout
 
     private var iPhoneLayout: some View {
-        Markdown(markdownContent)
-            .markdownTheme(.recipe)
-            .padding()
+        VStack(alignment: .leading, spacing: 16) {
+            // Header with scaled yields
+            RecipeHeaderView(
+                title: recipeFile.title,
+                description: recipeFile.description,
+                tags: recipeFile.tags,
+                yield: recipeFile.yield,
+                portionMultiplier: selectedPortion.multiplier
+            )
+            .padding(.horizontal)
+
+            Divider()
+
+            // Portion selector
+            PortionSelectorView(selectedPortion: $selectedPortion)
+                .padding(.horizontal)
+
+            // Ingredients with scaling
+            IngredientsListView(
+                ingredientGroups: recipeFile.ingredientGroups,
+                portionMultiplier: selectedPortion.multiplier
+            )
+            .padding(.horizontal)
+
+            Divider()
+
+            // Instructions (still markdown)
+            if let instructions = recipeFile.instructions, !instructions.isEmpty {
+                Markdown(instructions)
+                    .markdownTheme(.recipe)
+                    .padding(.horizontal)
+            }
+        }
+        .padding(.vertical)
     }
 }
 
@@ -105,27 +145,21 @@ struct RecipeDetailContent: View {
         RecipeDetailContent(
             recipeFile: RecipeFile(
                 filePath: URL(fileURLWithPath: "/example/recipe.md"),
-                recipe: Recipe(title: "Chocolate Chip Cookies")
+                recipe: Recipe(
+                    title: "Chocolate Chip Cookies",
+                    description: "Classic homemade chocolate chip cookies.",
+                    tags: ["dessert", "baking"],
+                    yield: Yield(amount: [Amount(24, unit: "cookies")]),
+                    ingredientGroups: [
+                        IngredientGroup(ingredients: [
+                            Ingredient(name: "flour", amount: Amount(2, unit: "cups")),
+                            Ingredient(name: "baking soda", amount: Amount(1, unit: "tsp"))
+                        ])
+                    ],
+                    instructions: "1. Preheat oven\n2. Mix and bake"
+                )
             ),
-            markdownContent: """
-            # Chocolate Chip Cookies
-
-            Classic homemade chocolate chip cookies.
-
-            *dessert, baking*
-
-            **makes 24 cookies**
-
-            ---
-
-            - *2 cups* flour
-            - *1 tsp* baking soda
-
-            ---
-
-            1. Preheat oven
-            2. Mix and bake
-            """
+            markdownContent: "# Chocolate Chip Cookies\n\nSample content..."
         )
         .environment(\.horizontalSizeClass, .compact)
     }

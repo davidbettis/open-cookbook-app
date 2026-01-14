@@ -10,11 +10,12 @@ import RecipeMD
 import SwiftUI
 
 /// Displays ingredients and instructions side-by-side for iPad
-/// - Ingredients panel: 25% width, independently scrollable
-/// - Instructions panel: 75% width, independently scrollable
+/// - Ingredients panel: 33% width, independently scrollable
+/// - Instructions panel: 67% width, independently scrollable
 struct RecipeDetailSplitContent: View {
     let ingredientGroups: [IngredientGroup]
     let instructions: String?
+    @Binding var selectedPortion: PortionOption
 
     /// Proportion of width for ingredients panel
     private let ingredientsProportion: CGFloat = 0.33
@@ -50,12 +51,20 @@ struct RecipeDetailSplitContent: View {
                 .background(Color(.systemBackground))
                 .accessibilityAddTraits(.isHeader)
 
+            // Portion selector
+            PortionSelectorView(selectedPortion: $selectedPortion)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+
             Divider()
 
             // Scrollable ingredients list
             ScrollView {
-                IngredientsListView(ingredientGroups: ingredientGroups)
-                    .padding(16)
+                IngredientsListView(
+                    ingredientGroups: ingredientGroups,
+                    portionMultiplier: selectedPortion.multiplier
+                )
+                .padding(16)
             }
         }
         .background(Color(.secondarySystemBackground).opacity(0.3))
@@ -102,48 +111,64 @@ struct RecipeDetailSplitContent: View {
 // MARK: - Previews
 
 #Preview("Split Content") {
-    RecipeDetailSplitContent(
-        ingredientGroups: [
-            IngredientGroup(
-                title: "For the Dough",
-                ingredients: [
-                    Ingredient(name: "all-purpose flour", amount: Amount(2.25, unit: "cups")),
-                    Ingredient(name: "baking soda", amount: Amount(1, unit: "tsp")),
-                    Ingredient(name: "salt", amount: Amount(1, unit: "tsp"))
-                ]
-            ),
-            IngredientGroup(
-                title: "For the Mix-ins",
-                ingredients: [
-                    Ingredient(name: "chocolate chips", amount: Amount(2, unit: "cups")),
-                    Ingredient(name: "walnuts, chopped", amount: Amount(1, unit: "cup"))
-                ]
+    struct PreviewWrapper: View {
+        @State private var portion = PortionOption.whole
+
+        var body: some View {
+            RecipeDetailSplitContent(
+                ingredientGroups: [
+                    IngredientGroup(
+                        title: "For the Dough",
+                        ingredients: [
+                            Ingredient(name: "all-purpose flour", amount: Amount(2.25, unit: "cups")),
+                            Ingredient(name: "baking soda", amount: Amount(1, unit: "tsp")),
+                            Ingredient(name: "salt", amount: Amount(1, unit: "tsp"))
+                        ]
+                    ),
+                    IngredientGroup(
+                        title: "For the Mix-ins",
+                        ingredients: [
+                            Ingredient(name: "chocolate chips", amount: Amount(2, unit: "cups")),
+                            Ingredient(name: "walnuts, chopped", amount: Amount(1, unit: "cup"))
+                        ]
+                    )
+                ],
+                instructions: """
+                1. Preheat oven to 375°F (190°C)
+                2. Mix flour, baking soda, and salt in a bowl
+                3. In a separate bowl, cream together butter and sugars
+                4. Beat in eggs and vanilla to butter mixture
+                5. Gradually blend in flour mixture
+                6. Stir in chocolate chips and walnuts
+                7. Drop rounded tablespoons onto ungreased cookie sheets
+                8. Bake for 10-12 minutes until golden brown
+                9. Cool on baking sheet for 2 minutes before transferring
+                """,
+                selectedPortion: $portion
             )
-        ],
-        instructions: """
-        1. Preheat oven to 375°F (190°C)
-        2. Mix flour, baking soda, and salt in a bowl
-        3. In a separate bowl, cream together butter and sugars
-        4. Beat in eggs and vanilla to butter mixture
-        5. Gradually blend in flour mixture
-        6. Stir in chocolate chips and walnuts
-        7. Drop rounded tablespoons onto ungreased cookie sheets
-        8. Bake for 10-12 minutes until golden brown
-        9. Cool on baking sheet for 2 minutes before transferring
-        """
-    )
-    .frame(height: 500)
+            .frame(height: 500)
+        }
+    }
+    return PreviewWrapper()
 }
 
 #Preview("No Instructions") {
-    RecipeDetailSplitContent(
-        ingredientGroups: [
-            IngredientGroup(ingredients: [
-                Ingredient(name: "ingredient 1", amount: Amount(1, unit: "cup")),
-                Ingredient(name: "ingredient 2", amount: Amount(2, unit: "tbsp"))
-            ])
-        ],
-        instructions: nil
-    )
-    .frame(height: 400)
+    struct PreviewWrapper: View {
+        @State private var portion = PortionOption.whole
+
+        var body: some View {
+            RecipeDetailSplitContent(
+                ingredientGroups: [
+                    IngredientGroup(ingredients: [
+                        Ingredient(name: "ingredient 1", amount: Amount(1, unit: "cup")),
+                        Ingredient(name: "ingredient 2", amount: Amount(2, unit: "tbsp"))
+                    ])
+                ],
+                instructions: nil,
+                selectedPortion: $portion
+            )
+            .frame(height: 400)
+        }
+    }
+    return PreviewWrapper()
 }

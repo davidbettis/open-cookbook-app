@@ -14,6 +14,7 @@ struct RecipeHeaderView: View {
     let description: String?
     let tags: [String]
     let yield: Yield
+    var portionMultiplier: Double = 1.0
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -36,9 +37,10 @@ struct RecipeHeaderView: View {
                 TagsView(tags: tags)
             }
 
-            // Yields
-            if !yield.formatted.isEmpty {
-                YieldView(yield: yield)
+            // Yields (scaled by portion multiplier)
+            let scaledYield = yield.formattedScaled(by: portionMultiplier)
+            if !scaledYield.isEmpty {
+                YieldView(yieldText: scaledYield)
             }
         }
     }
@@ -71,14 +73,14 @@ private struct TagsView: View {
 
 /// Displays yield information prominently
 private struct YieldView: View {
-    let yield: Yield
+    let yieldText: String
 
     var body: some View {
-        Text(yield.formatted)
+        Text(yieldText)
             .font(.subheadline)
             .fontWeight(.semibold)
             .foregroundStyle(.secondary)
-            .accessibilityLabel("Yield: \(yield.formatted)")
+            .accessibilityLabel("Yield: \(yieldText)")
     }
 }
 
