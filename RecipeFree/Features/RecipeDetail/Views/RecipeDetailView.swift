@@ -14,6 +14,7 @@ struct RecipeDetailView: View {
     var recipeStore: RecipeStore?
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var markdownContent: String?
     @State private var loadError: Error?
     @State private var currentRecipeFile: RecipeFile?
@@ -25,15 +26,31 @@ struct RecipeDetailView: View {
     private let parser = RecipeFileParser()
 
     var body: some View {
-        ScrollView {
+        Group {
             if let content = markdownContent {
-                Markdown(content)
-                    .markdownTheme(.recipe)
-                    .padding()
+                if horizontalSizeClass == .regular {
+                    // iPad: RecipeDetailContent handles its own scrolling
+                    RecipeDetailContent(
+                        recipeFile: currentRecipeFile ?? recipeFile,
+                        markdownContent: content
+                    )
+                } else {
+                    // iPhone: Wrap in ScrollView
+                    ScrollView {
+                        RecipeDetailContent(
+                            recipeFile: currentRecipeFile ?? recipeFile,
+                            markdownContent: content
+                        )
+                    }
+                }
             } else if let error = loadError {
-                errorView(error)
+                ScrollView {
+                    errorView(error)
+                }
             } else {
-                loadingView
+                ScrollView {
+                    loadingView
+                }
             }
         }
         .navigationTitle(recipeFile.title)

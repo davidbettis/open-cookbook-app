@@ -359,4 +359,175 @@ struct RecipeDetailViewTests {
         #expect(readContent?.contains("œufs") == true)
         #expect(readContent?.contains("150°C") == true)
     }
+
+    // MARK: - TC-021: iPad Split Layout Tests
+
+    @Test("RecipeFile provides ingredients for split layout")
+    func recipeFileProvidesIngredients() async throws {
+        let groups = [
+            IngredientGroup(
+                title: "For the Dough",
+                ingredients: [
+                    Ingredient(name: "flour", amount: Amount(2, unit: "cups")),
+                    Ingredient(name: "salt", amount: Amount(1, unit: "tsp"))
+                ]
+            ),
+            IngredientGroup(
+                title: "For the Filling",
+                ingredients: [
+                    Ingredient(name: "cream cheese", amount: Amount(1, unit: "cup"))
+                ]
+            )
+        ]
+
+        let recipe = Recipe(
+            title: "Test Recipe",
+            description: "A test description",
+            tags: ["test", "sample"],
+            yield: Yield(amount: [Amount(4, unit: "servings")]),
+            ingredientGroups: groups,
+            instructions: "1. Mix ingredients\n2. Bake"
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: URL(fileURLWithPath: "/tmp/test.md"),
+            recipe: recipe
+        )
+
+        // Verify all data needed for split layout is available
+        #expect(recipeFile.ingredientGroups.count == 2)
+        #expect(recipeFile.ingredientGroups[0].title == "For the Dough")
+        #expect(recipeFile.ingredientGroups[0].ingredients.count == 2)
+        #expect(recipeFile.ingredientGroups[1].title == "For the Filling")
+        #expect(recipeFile.instructions != nil)
+        #expect(recipeFile.instructions?.contains("Mix ingredients") == true)
+    }
+
+    @Test("RecipeFile provides header data for split layout")
+    func recipeFileProvidesHeaderData() async throws {
+        let recipe = Recipe(
+            title: "Chocolate Chip Cookies",
+            description: "Classic homemade cookies",
+            tags: ["dessert", "baking", "quick"],
+            yield: Yield(amount: [Amount(24, unit: "cookies")])
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: URL(fileURLWithPath: "/tmp/test.md"),
+            recipe: recipe
+        )
+
+        // Verify header data is available
+        #expect(recipeFile.title == "Chocolate Chip Cookies")
+        #expect(recipeFile.description == "Classic homemade cookies")
+        #expect(recipeFile.tags == ["dessert", "baking", "quick"])
+        #expect(recipeFile.yield.formatted.isEmpty == false)
+    }
+
+    @Test("RecipeFile instructions can be nil for split layout")
+    func recipeFileWithNilInstructions() async throws {
+        let recipe = Recipe(
+            title: "Simple List",
+            ingredientGroups: [
+                IngredientGroup(ingredients: [
+                    Ingredient(name: "item 1"),
+                    Ingredient(name: "item 2")
+                ])
+            ],
+            instructions: nil
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: URL(fileURLWithPath: "/tmp/test.md"),
+            recipe: recipe
+        )
+
+        #expect(recipeFile.instructions == nil)
+        #expect(recipeFile.ingredientGroups.count == 1)
+    }
+
+    // MARK: - TC-022: iPhone Vertical Layout Tests
+
+    @Test("RecipeFile provides all data for iPhone layout")
+    func recipeFileForPhoneLayout() async throws {
+        let recipe = Recipe(
+            title: "Test Recipe",
+            description: "A description",
+            tags: ["tag1", "tag2"],
+            yield: Yield(amount: [Amount(4, unit: "servings")]),
+            ingredientGroups: [
+                IngredientGroup(ingredients: [
+                    Ingredient(name: "flour", amount: Amount(2, unit: "cups"))
+                ])
+            ],
+            instructions: "1. Step one\n2. Step two"
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: URL(fileURLWithPath: "/tmp/test.md"),
+            recipe: recipe
+        )
+
+        // iPhone layout uses full markdown, so verify all components exist
+        #expect(!recipeFile.title.isEmpty)
+        #expect(recipeFile.description != nil)
+        #expect(!recipeFile.tags.isEmpty)
+        #expect(!recipeFile.ingredientGroups.isEmpty)
+        #expect(recipeFile.instructions != nil)
+    }
+
+    // MARK: - Header Component Tests
+
+    @Test("Recipe with all header fields")
+    func recipeWithAllHeaderFields() async throws {
+        let recipe = Recipe(
+            title: "Full Recipe",
+            description: "A complete recipe with all fields",
+            tags: ["dinner", "healthy", "quick", "family"],
+            yield: Yield(amount: [Amount(6, unit: "servings"), Amount(2, unit: "loaves")])
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: URL(fileURLWithPath: "/tmp/test.md"),
+            recipe: recipe
+        )
+
+        #expect(recipeFile.title == "Full Recipe")
+        #expect(recipeFile.description == "A complete recipe with all fields")
+        #expect(recipeFile.tags.count == 4)
+        #expect(recipeFile.yield.formatted.isEmpty == false)
+    }
+
+    @Test("Recipe with missing optional header fields")
+    func recipeWithMissingHeaderFields() async throws {
+        let recipe = Recipe(title: "Minimal Recipe")
+
+        let recipeFile = RecipeFile(
+            filePath: URL(fileURLWithPath: "/tmp/test.md"),
+            recipe: recipe
+        )
+
+        #expect(recipeFile.title == "Minimal Recipe")
+        #expect(recipeFile.description == nil)
+        #expect(recipeFile.tags.isEmpty)
+        // Yield with empty amounts should format to empty string
+        #expect(recipeFile.yield.formatted.isEmpty)
+    }
+
+    @Test("Recipe with empty tags array")
+    func recipeWithEmptyTags() async throws {
+        let recipe = Recipe(
+            title: "No Tags Recipe",
+            description: "Has description but no tags",
+            tags: []
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: URL(fileURLWithPath: "/tmp/test.md"),
+            recipe: recipe
+        )
+
+        #expect(recipeFile.tags.isEmpty)
+        #expect(recipeFile.description == "Has description but no tags")
+    }
 }
