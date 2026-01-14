@@ -9,6 +9,7 @@ import Testing
 import Foundation
 import SwiftUI
 import MarkdownUI
+import RecipeMD
 @testable import RecipeFree
 
 @Suite("Recipe Detail View Tests", .serialized)
@@ -72,8 +73,8 @@ struct RecipeDetailViewTests {
         #expect(readContent?.contains("Preheat oven") == true)
     }
 
-    @Test("Recipe model can be created for detail view")
-    func recipeModelForDetailView() async throws {
+    @Test("RecipeFile model can be created for detail view")
+    func recipeFileModelForDetailView() async throws {
         let content = """
         # Test Recipe
 
@@ -93,18 +94,21 @@ struct RecipeDetailViewTests {
         defer { cleanup(fileURL) }
 
         let recipe = Recipe(
-            filePath: fileURL,
             title: "Test Recipe",
             description: "A simple test recipe.",
             tags: ["test", "sample"],
-            yields: ["serves 4"]
+            yield: Yield(amount: [Amount(4, unit: "servings")])
         )
 
-        #expect(recipe.title == "Test Recipe")
-        #expect(recipe.description == "A simple test recipe.")
-        #expect(recipe.tags == ["test", "sample"])
-        #expect(recipe.yields == ["serves 4"])
-        #expect(recipe.filePath == fileURL)
+        let recipeFile = RecipeFile(
+            filePath: fileURL,
+            recipe: recipe
+        )
+
+        #expect(recipeFile.title == "Test Recipe")
+        #expect(recipeFile.description == "A simple test recipe.")
+        #expect(recipeFile.tags == ["test", "sample"])
+        #expect(recipeFile.filePath == fileURL)
     }
 
     // MARK: - TC-016: Display Recipe with Ingredient Groups
@@ -185,18 +189,17 @@ struct RecipeDetailViewTests {
         #expect(readContent?.contains("# Quick Snack") == true)
         #expect(readContent?.contains("crackers") == true)
 
-        // Verify Recipe model handles missing optional fields
-        let recipe = Recipe(
+        // Verify RecipeFile handles missing optional fields
+        let recipe = Recipe(title: "Quick Snack")
+        let recipeFile = RecipeFile(
             filePath: fileURL,
-            title: "Quick Snack"
-            // No description, tags, yields, or instructions
+            recipe: recipe
         )
 
-        #expect(recipe.title == "Quick Snack")
-        #expect(recipe.description == nil)
-        #expect(recipe.tags.isEmpty)
-        #expect(recipe.yields.isEmpty)
-        #expect(recipe.instructions == nil)
+        #expect(recipeFile.title == "Quick Snack")
+        #expect(recipeFile.description == nil)
+        #expect(recipeFile.tags.isEmpty)
+        #expect(recipeFile.instructions == nil)
     }
 
     @Test("Recipe with only title is valid")
@@ -213,35 +216,38 @@ struct RecipeDetailViewTests {
 
         #expect(readContent?.contains("# Empty Recipe") == true)
 
-        let recipe = Recipe(filePath: fileURL, title: "Empty Recipe")
-        #expect(recipe.title == "Empty Recipe")
+        let recipe = Recipe(title: "Empty Recipe")
+        let recipeFile = RecipeFile(filePath: fileURL, recipe: recipe)
+        #expect(recipeFile.title == "Empty Recipe")
     }
 
     // MARK: - Title Extraction Tests
 
-    @Test("Title extraction from Recipe model for navigation bar")
+    @Test("Title extraction from RecipeFile for navigation bar")
     func titleExtractionForNavBar() async throws {
-        let recipe = Recipe(
+        let recipe = Recipe(title: "Grandmother's Apple Pie")
+        let recipeFile = RecipeFile(
             filePath: URL(fileURLWithPath: "/tmp/test.md"),
-            title: "Grandmother's Apple Pie"
+            recipe: recipe
         )
 
         // Title should be used directly for navigation bar
-        #expect(recipe.title == "Grandmother's Apple Pie")
-        #expect(!recipe.title.isEmpty)
+        #expect(recipeFile.title == "Grandmother's Apple Pie")
+        #expect(!recipeFile.title.isEmpty)
     }
 
     @Test("Long title is preserved completely")
     func longTitlePreserved() async throws {
         let longTitle = "Super Delicious Extra Special Chocolate Fudge Brownie Cake with Caramel Drizzle"
 
-        let recipe = Recipe(
+        let recipe = Recipe(title: longTitle)
+        let recipeFile = RecipeFile(
             filePath: URL(fileURLWithPath: "/tmp/test.md"),
-            title: longTitle
+            recipe: recipe
         )
 
-        #expect(recipe.title == longTitle)
-        #expect(recipe.title.count == longTitle.count)
+        #expect(recipeFile.title == longTitle)
+        #expect(recipeFile.title.count == longTitle.count)
     }
 
     // MARK: - File Error Handling Tests

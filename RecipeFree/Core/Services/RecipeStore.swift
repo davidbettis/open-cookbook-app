@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import RecipeMD
 
 /// Central store for managing the recipe collection
 @MainActor
@@ -15,7 +16,7 @@ class RecipeStore {
     // MARK: - Properties
 
     /// All successfully parsed recipes
-    var recipes: [Recipe] = []
+    var recipes: [RecipeFile] = []
 
     /// Parse errors for files that couldn't be parsed
     var parseErrors: [URL: Error] = [:]
@@ -27,10 +28,10 @@ class RecipeStore {
     var isSaving = false
 
     /// Parser for RecipeMD files
-    private let parser: RecipeMDParser
+    private let parser: RecipeFileParser
 
     /// Serializer for converting recipes to markdown
-    private let serializer: RecipeMDSerializer
+    private let serializer: RecipeFileSerializer
 
     /// Filename generator for new recipes
     private let filenameGenerator: FilenameGenerator
@@ -39,13 +40,13 @@ class RecipeStore {
     private let fileMonitor: RecipeFileMonitor
 
     /// Cache of parsed recipes with modification dates
-    private var recipeCache: [URL: CachedRecipe] = [:]
+    private var recipeCache: [URL: CachedRecipeFile] = [:]
 
     // MARK: - Initialization
 
     init(
-        parser: RecipeMDParser = RecipeMDParser(),
-        serializer: RecipeMDSerializer = RecipeMDSerializer(),
+        parser: RecipeFileParser = RecipeFileParser(),
+        serializer: RecipeFileSerializer = RecipeFileSerializer(),
         filenameGenerator: FilenameGenerator = FilenameGenerator(),
         fileMonitor: RecipeFileMonitor = RecipeFileMonitor()
     ) {
@@ -103,11 +104,11 @@ class RecipeStore {
 
     /// Save a new recipe to the folder
     /// - Parameters:
-    ///   - recipe: The recipe to save (filePath will be generated)
+    ///   - recipeFile: The recipe file to save (filePath will be generated)
     ///   - folder: The folder to save in
-    /// - Returns: The saved recipe with updated filePath
+    /// - Returns: The saved recipe file with updated filePath
     /// - Throws: RecipeWriteError if save fails
-    func saveNewRecipe(_ recipe: Recipe, in folder: URL) async throws -> Recipe {
+    func saveNewRecipe(_ recipeFile: RecipeFile, in folder: URL) async throws -> RecipeFile {
         isSaving = true
         defer { isSaving = false }
 
@@ -122,13 +123,13 @@ class RecipeStore {
         // Generate unique filename
         let fileURL: URL
         do {
-            fileURL = try filenameGenerator.generateFileURL(for: recipe.title, in: folder)
+            fileURL = try filenameGenerator.generateFileURL(for: recipeFile.title, in: folder)
         } catch {
             throw RecipeWriteError.invalidFilename
         }
 
         // Serialize recipe to markdown
-        let markdown = serializer.serialize(recipe)
+        let markdown = serializer.serialize(recipeFile)
 
         // Write to file atomically
         do {
@@ -137,36 +138,30 @@ class RecipeStore {
             throw RecipeWriteError.writeError(underlying: error)
         }
 
-        // Create new recipe with correct file path
-        let savedRecipe = Recipe(
-            id: recipe.id,
+        // Create new recipe file with correct file path
+        let savedRecipeFile = RecipeFile(
+            id: recipeFile.id,
             filePath: fileURL,
-            title: recipe.title,
-            description: recipe.description,
-            tags: recipe.tags,
-            yields: recipe.yields,
-            ingredients: recipe.ingredients,
-            ingredientGroups: recipe.ingredientGroups,
-            instructions: recipe.instructions,
+            recipe: recipeFile.recipe,
             fileModifiedDate: Date()
         )
 
         // Add to recipes array and cache
-        recipes.append(savedRecipe)
+        recipes.append(savedRecipeFile)
         recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-        recipeCache[fileURL] = CachedRecipe(recipe: savedRecipe, modificationDate: Date())
+        recipeCache[fileURL] = CachedRecipeFile(recipeFile: savedRecipeFile, modificationDate: Date())
 
-        return savedRecipe
+        return savedRecipeFile
     }
 
     /// Update an existing recipe
-    /// - Parameter recipe: The recipe to update (uses existing filePath)
+    /// - Parameter recipeFile: The recipe file to update (uses existing filePath)
     /// - Throws: RecipeWriteError if update fails
-    func updateRecipe(_ recipe: Recipe) async throws {
+    func updateRecipe(_ recipeFile: RecipeFile) async throws {
         isSaving = true
         defer { isSaving = false }
 
-        let fileURL = recipe.filePath
+        let fileURL = recipeFile.filePath
 
         // Start accessing security-scoped resource
         let didStartAccess = fileURL.startAccessingSecurityScopedResource()
@@ -186,7 +181,7 @@ class RecipeStore {
         }
 
         // Serialize recipe to markdown
-        let markdown = serializer.serialize(recipe)
+        let markdown = serializer.serialize(recipeFile)
 
         // Write to file atomically (overwrites existing)
         do {
@@ -195,34 +190,28 @@ class RecipeStore {
             throw RecipeWriteError.writeError(underlying: error)
         }
 
-        // Update recipe in array
-        let updatedRecipe = Recipe(
-            id: recipe.id,
+        // Update recipe file with new modification date
+        let updatedRecipeFile = RecipeFile(
+            id: recipeFile.id,
             filePath: fileURL,
-            title: recipe.title,
-            description: recipe.description,
-            tags: recipe.tags,
-            yields: recipe.yields,
-            ingredients: recipe.ingredients,
-            ingredientGroups: recipe.ingredientGroups,
-            instructions: recipe.instructions,
+            recipe: recipeFile.recipe,
             fileModifiedDate: Date()
         )
 
-        if let index = recipes.firstIndex(where: { $0.id == recipe.id }) {
-            recipes[index] = updatedRecipe
+        if let index = recipes.firstIndex(where: { $0.id == recipeFile.id }) {
+            recipes[index] = updatedRecipeFile
         }
         recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
 
         // Update cache
-        recipeCache[fileURL] = CachedRecipe(recipe: updatedRecipe, modificationDate: Date())
+        recipeCache[fileURL] = CachedRecipeFile(recipeFile: updatedRecipeFile, modificationDate: Date())
     }
 
     /// Delete a recipe
-    /// - Parameter recipe: The recipe to delete
+    /// - Parameter recipeFile: The recipe file to delete
     /// - Throws: RecipeDeleteError if deletion fails
-    func deleteRecipe(_ recipe: Recipe) async throws {
-        let fileURL = recipe.filePath
+    func deleteRecipe(_ recipeFile: RecipeFile) async throws {
+        let fileURL = recipeFile.filePath
 
         // Start accessing security-scoped resource
         let didStartAccess = fileURL.startAccessingSecurityScopedResource()
@@ -260,7 +249,7 @@ class RecipeStore {
         }
 
         // Remove from recipes array
-        recipes.removeAll { $0.id == recipe.id }
+        recipes.removeAll { $0.id == recipeFile.id }
 
         // Remove from cache
         recipeCache.removeValue(forKey: fileURL)
@@ -276,15 +265,15 @@ class RecipeStore {
         let fileURLs = fileMonitor.fileURLs
 
         // Clear current state
-        var newRecipes: [Recipe] = []
+        var newRecipes: [RecipeFile] = []
         var newErrors: [URL: Error] = [:]
 
         // Parse files sequentially (fast for small collections)
         for url in fileURLs {
-            let result = parseRecipe(at: url)
+            let result = parseRecipeFile(at: url)
             switch result {
-            case .success(let recipe):
-                newRecipes.append(recipe)
+            case .success(let recipeFile):
+                newRecipes.append(recipeFile)
             case .failure(let error):
                 newErrors[url] = error
             }
@@ -300,8 +289,8 @@ class RecipeStore {
 
     /// Parse a single recipe file with caching
     /// - Parameter url: The file URL to parse
-    /// - Returns: Result containing Recipe or Error
-    private func parseRecipe(at url: URL) -> Result<Recipe, Error> {
+    /// - Returns: Result containing RecipeFile or Error
+    private func parseRecipeFile(at url: URL) -> Result<RecipeFile, Error> {
         // Get file modification date
         let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
         let modDate = attributes?[.modificationDate] as? Date ?? Date()
@@ -309,17 +298,17 @@ class RecipeStore {
         // Check cache
         if let cached = recipeCache[url],
            cached.modificationDate == modDate {
-            return .success(cached.recipe)
+            return .success(cached.recipeFile)
         }
 
         // Parse file
         do {
-            let recipe = try parser.parseMetadata(from: url)
+            let recipeFile = try parser.parse(from: url)
 
             // Update cache
-            recipeCache[url] = CachedRecipe(recipe: recipe, modificationDate: modDate)
+            recipeCache[url] = CachedRecipeFile(recipeFile: recipeFile, modificationDate: modDate)
 
-            return .success(recipe)
+            return .success(recipeFile)
         } catch {
             // Remove from cache if parsing fails
             recipeCache.removeValue(forKey: url)
@@ -329,9 +318,9 @@ class RecipeStore {
 
     // MARK: - Helper Types
 
-    /// Cached recipe with modification date for cache invalidation
-    private struct CachedRecipe {
-        let recipe: Recipe
+    /// Cached recipe file with modification date for cache invalidation
+    private struct CachedRecipeFile {
+        let recipeFile: RecipeFile
         let modificationDate: Date
     }
 }

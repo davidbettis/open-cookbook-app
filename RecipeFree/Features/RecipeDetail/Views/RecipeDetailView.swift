@@ -7,21 +7,22 @@
 
 import MarkdownUI
 import SwiftUI
+import RecipeMD
 
 struct RecipeDetailView: View {
-    let recipe: Recipe
+    let recipeFile: RecipeFile
     var recipeStore: RecipeStore?
 
     @Environment(\.dismiss) private var dismiss
     @State private var markdownContent: String?
     @State private var loadError: Error?
-    @State private var currentRecipe: Recipe?
+    @State private var currentRecipeFile: RecipeFile?
     @State private var showDeleteConfirmation = false
     @State private var deleteError: Error?
     @State private var showDeleteError = false
-    @State private var recipeToEdit: Recipe?
+    @State private var recipeToEdit: RecipeFile?
 
-    private let parser = RecipeMDParser()
+    private let parser = RecipeFileParser()
 
     var body: some View {
         ScrollView {
@@ -35,7 +36,7 @@ struct RecipeDetailView: View {
                 loadingView
             }
         }
-        .navigationTitle(recipe.title)
+        .navigationTitle(recipeFile.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -43,7 +44,7 @@ struct RecipeDetailView: View {
                 if let content = markdownContent {
                     ShareLink(
                         item: content,
-                        subject: Text(recipe.title),
+                        subject: Text(recipeFile.title),
                         message: Text("Check out this recipe!")
                     ) {
                         Image(systemName: "square.and.arrow.up")
@@ -76,13 +77,13 @@ struct RecipeDetailView: View {
                 }
             }
         }
-        .sheet(item: $recipeToEdit) { fullRecipe in
+        .sheet(item: $recipeToEdit) { fullRecipeFile in
             if let store = recipeStore {
                 RecipeFormView(
-                    viewModel: RecipeFormViewModel(mode: .edit(fullRecipe)),
+                    viewModel: RecipeFormViewModel(mode: .edit(fullRecipeFile)),
                     recipeStore: store,
-                    onSave: { savedRecipe in
-                        currentRecipe = savedRecipe
+                    onSave: { savedRecipeFile in
+                        currentRecipeFile = savedRecipeFile
                         Task {
                             await loadRecipeContent()
                         }
@@ -102,7 +103,7 @@ struct RecipeDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Are you sure you want to delete \"\(recipe.title)\"? This action cannot be undone.")
+            Text("Are you sure you want to delete \"\(recipeFile.title)\"? This action cannot be undone.")
         }
         .alert("Error Deleting Recipe", isPresented: $showDeleteError) {
             Button("OK") {}
@@ -111,11 +112,11 @@ struct RecipeDetailView: View {
                 Text(error.localizedDescription)
             }
         }
-        .task(id: recipe.id) {
+        .task(id: recipeFile.id) {
             // Reset state when recipe changes
             markdownContent = nil
             loadError = nil
-            currentRecipe = recipe
+            currentRecipeFile = recipeFile
             await loadRecipeContent()
         }
     }
@@ -125,7 +126,7 @@ struct RecipeDetailView: View {
     private func loadRecipeContent() async {
         do {
             // Start accessing security-scoped resource if needed
-            let fileToLoad = currentRecipe?.filePath ?? recipe.filePath
+            let fileToLoad = currentRecipeFile?.filePath ?? recipeFile.filePath
             let didStartAccess = fileToLoad.startAccessingSecurityScopedResource()
             defer {
                 if didStartAccess {
@@ -151,7 +152,7 @@ struct RecipeDetailView: View {
     // MARK: - Edit
 
     private func loadFullRecipeAndEdit() {
-        let fileURL = currentRecipe?.filePath ?? recipe.filePath
+        let fileURL = currentRecipeFile?.filePath ?? recipeFile.filePath
 
         // Access security-scoped resource
         let didStartAccess = fileURL.startAccessingSecurityScopedResource()
@@ -163,10 +164,10 @@ struct RecipeDetailView: View {
 
         do {
             // Parse full recipe and set it - this triggers sheet presentation
-            recipeToEdit = try parser.parseFullRecipe(from: fileURL)
+            recipeToEdit = try parser.parse(from: fileURL)
         } catch {
             // Fall back to partial recipe if full parse fails
-            recipeToEdit = currentRecipe ?? recipe
+            recipeToEdit = currentRecipeFile ?? recipeFile
         }
     }
 
@@ -176,7 +177,7 @@ struct RecipeDetailView: View {
         guard let store = recipeStore else { return }
 
         do {
-            try await store.deleteRecipe(currentRecipe ?? recipe)
+            try await store.deleteRecipe(currentRecipeFile ?? recipeFile)
             await MainActor.run {
                 dismiss()
             }
@@ -225,9 +226,9 @@ struct RecipeDetailView: View {
 #Preview("Recipe Detail") {
     NavigationStack {
         RecipeDetailView(
-            recipe: Recipe(
+            recipeFile: RecipeFile(
                 filePath: URL(fileURLWithPath: "/example/recipe.md"),
-                title: "Chocolate Chip Cookies"
+                recipe: Recipe(title: "Chocolate Chip Cookies")
             )
         )
     }
@@ -266,9 +267,9 @@ struct RecipeDetailView: View {
 
     return NavigationStack {
         RecipeDetailView(
-            recipe: Recipe(
+            recipeFile: RecipeFile(
                 filePath: tempFile,
-                title: "Chocolate Chip Cookies"
+                recipe: Recipe(title: "Chocolate Chip Cookies")
             )
         )
     }

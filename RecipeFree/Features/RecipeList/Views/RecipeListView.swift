@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import RecipeMD
 
 /// ViewModel for RecipeListView
 @MainActor
@@ -21,7 +22,7 @@ class RecipeListViewModel {
     let searchService = RecipeSearchService()
 
     /// Recipes to display (filtered or all)
-    var displayedRecipes: [Recipe] {
+    var displayedRecipes: [RecipeFile] {
         if searchService.hasActiveFilters {
             return searchService.filteredRecipes
         }
@@ -64,7 +65,7 @@ struct RecipeListView: View {
     @State private var selectedError: (URL, Error)?
     @State private var showErrorAlert = false
     @State private var showAddRecipe = false
-    @State private var recipeToDelete: Recipe?
+    @State private var recipeToDelete: RecipeFile?
     @State private var showDeleteConfirmation = false
     @State private var deleteError: Error?
     @State private var showDeleteError = false
@@ -103,8 +104,8 @@ struct RecipeListView: View {
                     .accessibilityLabel("Add Recipe")
                 }
             }
-            .navigationDestination(for: Recipe.self) { recipe in
-                RecipeDetailView(recipe: recipe, recipeStore: viewModel.recipeStore)
+            .navigationDestination(for: RecipeFile.self) { recipeFile in
+                RecipeDetailView(recipeFile: recipeFile, recipeStore: viewModel.recipeStore)
             }
             .sheet(isPresented: $showAddRecipe) {
                 RecipeFormView(
@@ -129,9 +130,9 @@ struct RecipeListView: View {
                 titleVisibility: .visible
             ) {
                 Button("Delete", role: .destructive) {
-                    if let recipe = recipeToDelete {
+                    if let recipeFile = recipeToDelete {
                         Task {
-                            await deleteRecipe(recipe)
+                            await deleteRecipe(recipeFile)
                         }
                     }
                 }
@@ -139,8 +140,8 @@ struct RecipeListView: View {
                     recipeToDelete = nil
                 }
             } message: {
-                if let recipe = recipeToDelete {
-                    Text("Are you sure you want to delete \"\(recipe.title)\"? This action cannot be undone.")
+                if let recipeFile = recipeToDelete {
+                    Text("Are you sure you want to delete \"\(recipeFile.title)\"? This action cannot be undone.")
                 }
             }
             .alert("Error Deleting Recipe", isPresented: $showDeleteError) {
@@ -220,16 +221,16 @@ struct RecipeListView: View {
     private var recipeList: some View {
         List {
             // Show successfully parsed recipes
-            ForEach(viewModel.displayedRecipes) { recipe in
-                NavigationLink(value: recipe) {
-                    RecipeCard(recipe: recipe)
+            ForEach(viewModel.displayedRecipes) { recipeFile in
+                NavigationLink(value: recipeFile) {
+                    RecipeCard(recipeFile: recipeFile)
                 }
                 .buttonStyle(.plain)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
-                        recipeToDelete = recipe
+                        recipeToDelete = recipeFile
                         showDeleteConfirmation = true
                     } label: {
                         Label("Delete", systemImage: "trash")
@@ -263,9 +264,9 @@ struct RecipeListView: View {
     // MARK: - Actions
 
     /// Delete a recipe
-    private func deleteRecipe(_ recipe: Recipe) async {
+    private func deleteRecipe(_ recipeFile: RecipeFile) async {
         do {
-            try await viewModel.recipeStore.deleteRecipe(recipe)
+            try await viewModel.recipeStore.deleteRecipe(recipeFile)
             recipeToDelete = nil
             viewModel.syncSearchService()
         } catch {
@@ -295,25 +296,40 @@ struct RecipeListView: View {
     let store: RecipeStore = {
         let s = RecipeStore()
         s.recipes = [
-            Recipe(
+            RecipeFile(
                 filePath: URL(fileURLWithPath: "/tmp/cookies.md"),
-                title: "Chocolate Chip Cookies",
-                description: "Classic homemade cookies",
-                tags: ["dessert", "baking"],
-                ingredients: [Ingredient(name: "flour"), Ingredient(name: "sugar")]
+                recipe: Recipe(
+                    title: "Chocolate Chip Cookies",
+                    description: "Classic homemade cookies",
+                    tags: ["dessert", "baking"],
+                    ingredientGroups: [IngredientGroup(ingredients: [
+                        Ingredient(name: "flour"),
+                        Ingredient(name: "sugar")
+                    ])]
+                )
             ),
-            Recipe(
+            RecipeFile(
                 filePath: URL(fileURLWithPath: "/tmp/pasta.md"),
-                title: "Pasta Carbonara",
-                description: "Traditional Italian pasta dish",
-                tags: ["dinner", "italian", "quick"],
-                ingredients: [Ingredient(name: "pasta"), Ingredient(name: "eggs")]
+                recipe: Recipe(
+                    title: "Pasta Carbonara",
+                    description: "Traditional Italian pasta dish",
+                    tags: ["dinner", "italian", "quick"],
+                    ingredientGroups: [IngredientGroup(ingredients: [
+                        Ingredient(name: "pasta"),
+                        Ingredient(name: "eggs")
+                    ])]
+                )
             ),
-            Recipe(
+            RecipeFile(
                 filePath: URL(fileURLWithPath: "/tmp/salad.md"),
-                title: "Caesar Salad",
-                tags: ["lunch", "salad", "quick"],
-                ingredients: [Ingredient(name: "lettuce"), Ingredient(name: "croutons")]
+                recipe: Recipe(
+                    title: "Caesar Salad",
+                    tags: ["lunch", "salad", "quick"],
+                    ingredientGroups: [IngredientGroup(ingredients: [
+                        Ingredient(name: "lettuce"),
+                        Ingredient(name: "croutons")
+                    ])]
+                )
             )
         ]
         return s

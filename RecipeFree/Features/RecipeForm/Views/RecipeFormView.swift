@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import RecipeMD
 
 /// Form view for creating or editing recipes
 struct RecipeFormView: View {
@@ -14,7 +15,7 @@ struct RecipeFormView: View {
 
     @State private var viewModel: RecipeFormViewModel
     let recipeStore: RecipeStore
-    let onSave: ((Recipe) -> Void)?
+    let onSave: ((RecipeFile) -> Void)?
 
     @State private var showCancelConfirmation = false
     @State private var showErrorAlert = false
@@ -24,7 +25,7 @@ struct RecipeFormView: View {
     init(
         viewModel: RecipeFormViewModel,
         recipeStore: RecipeStore,
-        onSave: ((Recipe) -> Void)? = nil
+        onSave: ((RecipeFile) -> Void)? = nil
     ) {
         self._viewModel = State(initialValue: viewModel)
         self.recipeStore = recipeStore
@@ -208,8 +209,8 @@ struct RecipeFormView: View {
         }
 
         do {
-            let savedRecipe = try await viewModel.save(to: folder, using: recipeStore)
-            onSave?(savedRecipe)
+            let savedRecipeFile = try await viewModel.save(to: folder, using: recipeStore)
+            onSave?(savedRecipeFile)
             dismiss()
         } catch {
             showErrorAlert = true
@@ -228,21 +229,23 @@ struct RecipeFormView: View {
 }
 
 #Preview("Edit Recipe") {
-    let recipe = Recipe(
+    let recipeFile = RecipeFile(
         filePath: URL(fileURLWithPath: "/tmp/test.md"),
-        title: "Chocolate Chip Cookies",
-        description: "Classic homemade cookies",
-        tags: ["dessert", "baking"],
-        yields: ["makes 24 cookies"],
-        ingredients: [
-            Ingredient(quantity: "2", unit: "cups", name: "flour"),
-            Ingredient(quantity: "1", unit: "cup", name: "sugar")
-        ],
-        instructions: "1. Mix ingredients\n2. Bake at 350F"
+        recipe: Recipe(
+            title: "Chocolate Chip Cookies",
+            description: "Classic homemade cookies",
+            tags: ["dessert", "baking"],
+            yield: Yield(amount: [Amount(24, unit: "cookies")]),
+            ingredientGroups: [IngredientGroup(ingredients: [
+                Ingredient(name: "flour", amount: Amount(2, unit: "cups")),
+                Ingredient(name: "sugar", amount: Amount(1, unit: "cup"))
+            ])],
+            instructions: "1. Mix ingredients\n2. Bake at 350F"
+        )
     )
 
     RecipeFormView(
-        viewModel: RecipeFormViewModel(mode: .edit(recipe)),
+        viewModel: RecipeFormViewModel(mode: .edit(recipeFile)),
         recipeStore: RecipeStore()
     )
     .environment(FolderManager())

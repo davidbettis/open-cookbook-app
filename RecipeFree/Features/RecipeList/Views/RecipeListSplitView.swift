@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import RecipeMD
 
 /// iPad recipe list view using NavigationSplitView
 struct RecipeListSplitView: View {
@@ -14,7 +15,7 @@ struct RecipeListSplitView: View {
 
     @Environment(FolderManager.self) private var folderManager
     @State private var viewModel: RecipeListViewModel
-    @State private var selectedRecipe: Recipe?
+    @State private var selectedRecipeFile: RecipeFile?
     @State private var selectedError: (URL, Error)?
     @State private var showErrorAlert = false
 
@@ -134,19 +135,19 @@ struct RecipeListSplitView: View {
     }
 
     private var recipeList: some View {
-        List(selection: $selectedRecipe) {
+        List(selection: $selectedRecipeFile) {
             // Show successfully parsed recipes
-            ForEach(viewModel.displayedRecipes) { recipe in
+            ForEach(viewModel.displayedRecipes) { recipeFile in
                 Button {
-                    selectedRecipe = recipe
+                    selectedRecipeFile = recipeFile
                 } label: {
-                    RecipeCard(recipe: recipe)
+                    RecipeCard(recipeFile: recipeFile)
                 }
                 .buttonStyle(.plain)
                 .listRowSeparator(.hidden)
                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                 .listRowBackground(
-                    selectedRecipe?.id == recipe.id ?
+                    selectedRecipeFile?.id == recipeFile.id ?
                     Color.accentColor.opacity(0.1) : Color.clear
                 )
             }
@@ -190,8 +191,8 @@ struct RecipeListSplitView: View {
 
     @ViewBuilder
     private var detailContent: some View {
-        if let recipe = selectedRecipe {
-            RecipeDetailView(recipe: recipe)
+        if let recipeFile = selectedRecipeFile {
+            RecipeDetailView(recipeFile: recipeFile)
         } else {
             // No selection
             ContentUnavailableView(
@@ -208,7 +209,7 @@ struct RecipeListSplitView: View {
 /// Temporary placeholder until F004 implements full detail view
 struct RecipeDetailPlaceholder: View {
 
-    let recipe: Recipe
+    let recipeFile: RecipeFile
 
     var body: some View {
         VStack(spacing: 16) {
@@ -216,11 +217,11 @@ struct RecipeDetailPlaceholder: View {
                 .font(.system(size: 60))
                 .foregroundStyle(.secondary)
 
-            Text(recipe.title)
+            Text(recipeFile.title)
                 .font(.title)
                 .fontWeight(.semibold)
 
-            if let description = recipe.description {
+            if let description = recipeFile.description {
                 Text(description)
                     .font(.body)
                     .foregroundStyle(.secondary)
@@ -228,9 +229,9 @@ struct RecipeDetailPlaceholder: View {
                     .padding(.horizontal)
             }
 
-            if !recipe.tags.isEmpty {
+            if !recipeFile.tags.isEmpty {
                 HStack {
-                    ForEach(recipe.tags, id: \.self) { tag in
+                    ForEach(recipeFile.tags, id: \.self) { tag in
                         Text(tag)
                             .font(.caption)
                             .padding(.horizontal, 8)
@@ -250,7 +251,7 @@ struct RecipeDetailPlaceholder: View {
                 .foregroundStyle(.tertiary)
         }
         .padding()
-        .navigationTitle(recipe.title)
+        .navigationTitle(recipeFile.title)
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -261,25 +262,40 @@ struct RecipeDetailPlaceholder: View {
     let store: RecipeStore = {
         let s = RecipeStore()
         s.recipes = [
-            Recipe(
+            RecipeFile(
                 filePath: URL(fileURLWithPath: "/tmp/cookies.md"),
-                title: "Chocolate Chip Cookies",
-                description: "Classic homemade cookies",
-                tags: ["dessert", "baking"],
-                ingredients: [Ingredient(name: "flour"), Ingredient(name: "sugar")]
+                recipe: Recipe(
+                    title: "Chocolate Chip Cookies",
+                    description: "Classic homemade cookies",
+                    tags: ["dessert", "baking"],
+                    ingredientGroups: [IngredientGroup(ingredients: [
+                        Ingredient(name: "flour"),
+                        Ingredient(name: "sugar")
+                    ])]
+                )
             ),
-            Recipe(
+            RecipeFile(
                 filePath: URL(fileURLWithPath: "/tmp/pasta.md"),
-                title: "Pasta Carbonara",
-                description: "Traditional Italian pasta dish",
-                tags: ["dinner", "italian", "quick"],
-                ingredients: [Ingredient(name: "pasta"), Ingredient(name: "eggs")]
+                recipe: Recipe(
+                    title: "Pasta Carbonara",
+                    description: "Traditional Italian pasta dish",
+                    tags: ["dinner", "italian", "quick"],
+                    ingredientGroups: [IngredientGroup(ingredients: [
+                        Ingredient(name: "pasta"),
+                        Ingredient(name: "eggs")
+                    ])]
+                )
             ),
-            Recipe(
+            RecipeFile(
                 filePath: URL(fileURLWithPath: "/tmp/salad.md"),
-                title: "Caesar Salad",
-                tags: ["lunch", "salad", "quick"],
-                ingredients: [Ingredient(name: "lettuce"), Ingredient(name: "croutons")]
+                recipe: Recipe(
+                    title: "Caesar Salad",
+                    tags: ["lunch", "salad", "quick"],
+                    ingredientGroups: [IngredientGroup(ingredients: [
+                        Ingredient(name: "lettuce"),
+                        Ingredient(name: "croutons")
+                    ])]
+                )
             )
         ]
         return s

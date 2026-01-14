@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import RecipeMD
 
 /// Service for searching and filtering recipes with debouncing
 @MainActor
@@ -32,7 +33,7 @@ final class RecipeSearchService {
     private(set) var availableTags: [TagInfo] = []
 
     /// Filtered recipes based on search and tag filters
-    private(set) var filteredRecipes: [Recipe] = []
+    private(set) var filteredRecipes: [RecipeFile] = []
 
     /// Whether any filters are active
     var hasActiveFilters: Bool {
@@ -58,7 +59,7 @@ final class RecipeSearchService {
 
     private let searchTextSubject = PassthroughSubject<String, Never>()
     private var cancellables = Set<AnyCancellable>()
-    private var allRecipes: [Recipe] = []
+    private var allRecipes: [RecipeFile] = []
 
     // MARK: - Initialization
 
@@ -69,8 +70,8 @@ final class RecipeSearchService {
     // MARK: - Public Methods
 
     /// Update the recipe collection and recalculate filters
-    /// - Parameter recipes: The full collection of recipes
-    func updateRecipes(_ recipes: [Recipe]) {
+    /// - Parameter recipes: The full collection of recipe files
+    func updateRecipes(_ recipes: [RecipeFile]) {
         allRecipes = recipes
         extractTags()
         applyFilters()
@@ -124,8 +125,8 @@ final class RecipeSearchService {
     private func extractTags() {
         var tagCounts: [String: Int] = [:]
 
-        for recipe in allRecipes {
-            for tag in recipe.tags {
+        for recipeFile in allRecipes {
+            for tag in recipeFile.tags {
                 let normalizedTag = tag.lowercased().trimmingCharacters(in: .whitespaces)
                 tagCounts[normalizedTag, default: 0] += 1
             }
@@ -143,8 +144,8 @@ final class RecipeSearchService {
 
         // Apply tag filter (AND logic - all selected tags must match)
         if !selectedTags.isEmpty {
-            results = results.filter { recipe in
-                let recipeTags = Set(recipe.tags.map { $0.lowercased() })
+            results = results.filter { recipeFile in
+                let recipeTags = Set(recipeFile.tags.map { $0.lowercased() })
                 return selectedTags.allSatisfy { recipeTags.contains($0) }
             }
         }
@@ -152,8 +153,8 @@ final class RecipeSearchService {
         // Apply search filter
         if !debouncedSearchText.isEmpty {
             let searchTerm = debouncedSearchText.lowercased()
-            results = results.filter { recipe in
-                matchesSearch(recipe: recipe, searchTerm: searchTerm)
+            results = results.filter { recipeFile in
+                matchesSearch(recipeFile: recipeFile, searchTerm: searchTerm)
             }
         }
 
@@ -162,10 +163,12 @@ final class RecipeSearchService {
 
     /// Check if a recipe matches the search term
     /// - Parameters:
-    ///   - recipe: The recipe to check
+    ///   - recipeFile: The recipe file to check
     ///   - searchTerm: The lowercased search term
     /// - Returns: True if the recipe matches
-    private func matchesSearch(recipe: Recipe, searchTerm: String) -> Bool {
+    private func matchesSearch(recipeFile: RecipeFile, searchTerm: String) -> Bool {
+        let recipe = recipeFile.recipe
+
         // Check title
         if recipe.title.lowercased().contains(searchTerm) {
             return true
@@ -182,16 +185,10 @@ final class RecipeSearchService {
             return true
         }
 
-        // Check ingredients (name only for now)
-        if recipe.ingredients.contains(where: { $0.name.lowercased().contains(searchTerm) }) {
+        // Check all ingredients from all groups
+        let allIngredients = recipe.ingredientGroups.flatMap { $0.allIngredients }
+        if allIngredients.contains(where: { $0.name.lowercased().contains(searchTerm) }) {
             return true
-        }
-
-        // Check ingredient groups
-        for group in recipe.ingredientGroups {
-            if group.ingredients.contains(where: { $0.name.lowercased().contains(searchTerm) }) {
-                return true
-            }
         }
 
         // Check instructions

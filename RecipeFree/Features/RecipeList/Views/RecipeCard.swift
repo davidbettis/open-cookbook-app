@@ -6,26 +6,27 @@
 //
 
 import SwiftUI
+import RecipeMD
 
 /// Card view component for displaying a recipe in the list
 struct RecipeCard: View {
 
     // MARK: - Properties
 
-    let recipe: Recipe
+    let recipeFile: RecipeFile
 
     // MARK: - Body
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             // Title
-            Text(recipe.title)
+            Text(recipeFile.title)
                 .font(.headline)
                 .lineLimit(2)
                 .foregroundStyle(.primary)
 
             // Primary tag chip
-            if let tag = recipe.primaryTag {
+            if let tag = recipeFile.primaryTag {
                 Text(tag)
                     .font(.caption)
                     .padding(.horizontal, 8)
@@ -36,7 +37,7 @@ struct RecipeCard: View {
             }
 
             // Description preview
-            if let description = recipe.description {
+            if let description = recipeFile.description {
                 Text(description)
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -55,13 +56,13 @@ struct RecipeCard: View {
     // MARK: - Accessibility
 
     private var accessibilityLabel: String {
-        var label = "Recipe: \(recipe.title)"
+        var label = "Recipe: \(recipeFile.title)"
 
-        if let tag = recipe.primaryTag {
+        if let tag = recipeFile.primaryTag {
             label += ", Category: \(tag)"
         }
 
-        if let description = recipe.description {
+        if let description = recipeFile.description {
             label += ", \(description)"
         }
 
@@ -72,39 +73,47 @@ struct RecipeCard: View {
 // MARK: - Previews
 
 #Preview("Basic Recipe") {
-    RecipeCard(recipe: Recipe(
+    RecipeCard(recipeFile: RecipeFile(
         filePath: URL(fileURLWithPath: "/tmp/test.md"),
-        title: "Chocolate Chip Cookies",
-        description: "Classic homemade cookies",
-        tags: ["dessert", "baking"]
+        recipe: Recipe(
+            title: "Chocolate Chip Cookies",
+            description: "Classic homemade cookies",
+            tags: ["dessert", "baking"]
+        )
     ))
     .padding()
 }
 
 #Preview("No Description") {
-    RecipeCard(recipe: Recipe(
+    RecipeCard(recipeFile: RecipeFile(
         filePath: URL(fileURLWithPath: "/tmp/test.md"),
-        title: "Simple Pasta",
-        tags: ["dinner", "italian"]
+        recipe: Recipe(
+            title: "Simple Pasta",
+            tags: ["dinner", "italian"]
+        )
     ))
     .padding()
 }
 
 #Preview("No Tags") {
-    RecipeCard(recipe: Recipe(
+    RecipeCard(recipeFile: RecipeFile(
         filePath: URL(fileURLWithPath: "/tmp/test.md"),
-        title: "Minimal Recipe",
-        description: "A very simple recipe"
+        recipe: Recipe(
+            title: "Minimal Recipe",
+            description: "A very simple recipe"
+        )
     ))
     .padding()
 }
 
 #Preview("Long Title") {
-    RecipeCard(recipe: Recipe(
+    RecipeCard(recipeFile: RecipeFile(
         filePath: URL(fileURLWithPath: "/tmp/test.md"),
-        title: "Super Delicious Extra Long Recipe Title That Should Truncate",
-        description: "This is a recipe with a very long title to test truncation",
-        tags: ["test"]
+        recipe: Recipe(
+            title: "Super Delicious Extra Long Recipe Title That Should Truncate",
+            description: "This is a recipe with a very long title to test truncation",
+            tags: ["test"]
+        )
     ))
     .padding()
 }

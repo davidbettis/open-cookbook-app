@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A29304422F17172C00ADF13F /* RecipeMD in Frameworks */ = {isa = PBXBuildFile; productRef = A2RECIPEMD022F0DC33000EC64 /* RecipeMD */; };
+		A29304432F17172C00ADF13F /* RecipeMD in Frameworks */ = {isa = PBXBuildFile; productRef = A2RECIPEMD032F0DC33000EC64 /* RecipeMD */; };
 		A2F047012F0F30A300E180A7 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = A2MARKDOWN022F0DC33000EC64 /* MarkdownUI */; };
 		A2F047022F0F30A300E180A7 /* MarkdownUI in Frameworks */ = {isa = PBXBuildFile; productRef = A2MARKDOWN032F0DC33000EC64 /* MarkdownUI */; };
 /* End PBXBuildFile section */
@@ -57,6 +59,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A29304422F17172C00ADF13F /* RecipeMD in Frameworks */,
 				A2F047012F0F30A300E180A7 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -65,6 +68,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A29304432F17172C00ADF13F /* RecipeMD in Frameworks */,
 				A2F047022F0F30A300E180A7 /* MarkdownUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -120,6 +124,7 @@
 			name = RecipeFree;
 			packageProductDependencies = (
 				A2MARKDOWN022F0DC33000EC64 /* MarkdownUI */,
+				A2RECIPEMD022F0DC33000EC64 /* RecipeMD */,
 			);
 			productName = RecipeFree;
 			productReference = A20DCD862F0DC32F00EC64C2 /* RecipeFree.app */;
@@ -144,6 +149,7 @@
 			name = RecipeFreeTests;
 			packageProductDependencies = (
 				A2MARKDOWN032F0DC33000EC64 /* MarkdownUI */,
+				A2RECIPEMD032F0DC33000EC64 /* RecipeMD */,
 			);
 			productName = RecipeFreeTests;
 			productReference = A20DCD932F0DC33000EC64C2 /* RecipeFreeTests.xctest */;
@@ -205,6 +211,7 @@
 			mainGroup = A20DCD7D2F0DC32F00EC64C2;
 			packageReferences = (
 				A2MARKDOWN012F0DC33000EC64 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */,
+				A2RECIPEMD012F0DC33000EC64 /* XCRemoteSwiftPackageReference "recipemd-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A20DCD872F0DC32F00EC64C2 /* Products */;
@@ -583,6 +590,14 @@
 				minimumVersion = 2.4.1;
 			};
 		};
+		A2RECIPEMD012F0DC33000EC64 /* XCRemoteSwiftPackageReference "recipemd-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/davidbettis/recipemd-swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -595,6 +610,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A2MARKDOWN012F0DC33000EC64 /* XCRemoteSwiftPackageReference "swift-markdown-ui" */;
 			productName = MarkdownUI;
+		};
+		A2RECIPEMD022F0DC33000EC64 /* RecipeMD */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A2RECIPEMD012F0DC33000EC64 /* XCRemoteSwiftPackageReference "recipemd-swift" */;
+			productName = RecipeMD;
+		};
+		A2RECIPEMD032F0DC33000EC64 /* RecipeMD */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A2RECIPEMD012F0DC33000EC64 /* XCRemoteSwiftPackageReference "recipemd-swift" */;
+			productName = RecipeMD;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

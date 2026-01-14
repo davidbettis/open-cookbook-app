@@ -1,5 +1,5 @@
 {
-  "originHash" : "04d9e4d8045a6310349928a2f8d2e6c6fe1c41e0c952a800e312800fac9624f9",
+  "originHash" : "d397296230f3cbb4d464d1033a2d29f2d00577df2cdf9a94650e3390b5640a31",
   "pins" : [
     {
       "identity" : "networkimage",
@@ -11,12 +11,30 @@
       }
     },
     {
+      "identity" : "recipemd-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/davidbettis/recipemd-swift",
+      "state" : {
+        "revision" : "8dfc0fe388c67f8710787343933ff3528c7aa533",
+        "version" : "1.0.0"
+      }
+    },
+    {
       "identity" : "swift-cmark",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-cmark",
       "state" : {
         "revision" : "5d9bdaa4228b381639fff09403e39a04926e2dbe",
         "version" : "0.7.1"
+      }
+    },
+    {
+      "identity" : "swift-markdown",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-markdown.git",
+      "state" : {
+        "revision" : "7d9a5ce307528578dfa777d505496bd5f544ad94",
+        "version" : "0.7.3"
       }
     },
     {

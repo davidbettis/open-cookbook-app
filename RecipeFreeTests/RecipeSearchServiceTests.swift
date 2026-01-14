@@ -7,6 +7,7 @@
 
 import Testing
 import Foundation
+import RecipeMD
 @testable import RecipeFree
 
 @MainActor
@@ -15,54 +16,62 @@ struct RecipeSearchServiceTests {
 
     // MARK: - Test Data
 
-    private func createTestRecipes() -> [Recipe] {
+    private func createTestRecipes() -> [RecipeFile] {
         [
-            Recipe(
+            RecipeFile(
                 filePath: URL(fileURLWithPath: "/tmp/cookies.md"),
-                title: "Chocolate Chip Cookies",
-                description: "Classic homemade chocolate chip cookies with a chewy center",
-                tags: ["dessert", "baking", "quick"],
-                ingredients: [
-                    Ingredient(name: "flour"),
-                    Ingredient(name: "chocolate chips"),
-                    Ingredient(name: "butter")
-                ],
-                instructions: "Mix ingredients and bake at 375F"
+                recipe: Recipe(
+                    title: "Chocolate Chip Cookies",
+                    description: "Classic homemade chocolate chip cookies with a chewy center",
+                    tags: ["dessert", "baking", "quick"],
+                    ingredientGroups: [IngredientGroup(ingredients: [
+                        Ingredient(name: "flour"),
+                        Ingredient(name: "chocolate chips"),
+                        Ingredient(name: "butter")
+                    ])],
+                    instructions: "Mix ingredients and bake at 375F"
+                )
             ),
-            Recipe(
+            RecipeFile(
                 filePath: URL(fileURLWithPath: "/tmp/pasta.md"),
-                title: "Pasta Carbonara",
-                description: "Traditional Italian pasta dish",
-                tags: ["dinner", "italian"],
-                ingredients: [
-                    Ingredient(name: "pasta"),
-                    Ingredient(name: "eggs"),
-                    Ingredient(name: "bacon")
-                ],
-                instructions: "Cook pasta, add eggs and bacon"
+                recipe: Recipe(
+                    title: "Pasta Carbonara",
+                    description: "Traditional Italian pasta dish",
+                    tags: ["dinner", "italian"],
+                    ingredientGroups: [IngredientGroup(ingredients: [
+                        Ingredient(name: "pasta"),
+                        Ingredient(name: "eggs"),
+                        Ingredient(name: "bacon")
+                    ])],
+                    instructions: "Cook pasta, add eggs and bacon"
+                )
             ),
-            Recipe(
+            RecipeFile(
                 filePath: URL(fileURLWithPath: "/tmp/salad.md"),
-                title: "Caesar Salad",
-                description: "Fresh and crispy caesar salad",
-                tags: ["lunch", "quick", "vegetarian"],
-                ingredients: [
-                    Ingredient(name: "lettuce"),
-                    Ingredient(name: "croutons"),
-                    Ingredient(name: "parmesan")
-                ],
-                instructions: "Toss lettuce with dressing and croutons"
+                recipe: Recipe(
+                    title: "Caesar Salad",
+                    description: "Fresh and crispy caesar salad",
+                    tags: ["lunch", "quick", "vegetarian"],
+                    ingredientGroups: [IngredientGroup(ingredients: [
+                        Ingredient(name: "lettuce"),
+                        Ingredient(name: "croutons"),
+                        Ingredient(name: "parmesan")
+                    ])],
+                    instructions: "Toss lettuce with dressing and croutons"
+                )
             ),
-            Recipe(
+            RecipeFile(
                 filePath: URL(fileURLWithPath: "/tmp/soup.md"),
-                title: "Chocolate Soup",
-                description: "Rich chocolate dessert soup",
-                tags: ["dessert", "vegetarian"],
-                ingredients: [
-                    Ingredient(name: "chocolate"),
-                    Ingredient(name: "cream")
-                ],
-                instructions: "Melt chocolate and mix with cream"
+                recipe: Recipe(
+                    title: "Chocolate Soup",
+                    description: "Rich chocolate dessert soup",
+                    tags: ["dessert", "vegetarian"],
+                    ingredientGroups: [IngredientGroup(ingredients: [
+                        Ingredient(name: "chocolate"),
+                        Ingredient(name: "cream")
+                    ])],
+                    instructions: "Melt chocolate and mix with cream"
+                )
             )
         ]
     }

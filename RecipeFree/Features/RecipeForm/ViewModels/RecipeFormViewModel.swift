@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import RecipeMD
 
 /// Represents an editable ingredient in the form
 struct EditableIngredient: Identifiable {
@@ -19,54 +20,77 @@ struct EditableIngredient: Identifiable {
         self.name = name
     }
 
-    /// Create from an Ingredient model
+    /// Create from a library Ingredient model
     init(from ingredient: Ingredient) {
-        self.id = ingredient.id
+        self.id = UUID()
         self.name = ingredient.name
 
-        // Combine quantity and unit into amount string
-        var amountParts: [String] = []
-        if let quantity = ingredient.quantity, !quantity.isEmpty {
-            amountParts.append(quantity)
+        // Format amount from library Amount type
+        if let amt = ingredient.amount {
+            self.amount = amt.formatted
+        } else {
+            self.amount = ""
         }
-        if let unit = ingredient.unit, !unit.isEmpty {
-            amountParts.append(unit)
-        }
-        self.amount = amountParts.joined(separator: " ")
     }
 
-    /// Convert to Ingredient model
+    /// Convert to library Ingredient model
     func toIngredient() -> Ingredient {
-        // Parse amount into quantity and unit
-        let parts = amount.trimmingCharacters(in: .whitespaces).split(separator: " ", maxSplits: 1)
+        let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        let trimmedAmount = amount.trimmingCharacters(in: .whitespaces)
 
-        let quantity: String?
-        let unit: String?
-
-        if parts.count >= 2 {
-            quantity = String(parts[0])
-            unit = String(parts[1])
-        } else if parts.count == 1 {
-            // Check if it's a number or unit
-            let firstPart = String(parts[0])
-            if firstPart.first?.isNumber == true || firstPart.contains("/") {
-                quantity = firstPart
-                unit = nil
-            } else {
-                quantity = nil
-                unit = firstPart
-            }
-        } else {
-            quantity = nil
-            unit = nil
+        if trimmedAmount.isEmpty {
+            return Ingredient(name: trimmedName)
         }
 
-        return Ingredient(
-            id: id,
-            quantity: quantity,
-            unit: unit,
-            name: name.trimmingCharacters(in: .whitespaces)
-        )
+        // Parse amount string into Amount
+        let parsedAmount = parseAmount(trimmedAmount)
+        return Ingredient(name: trimmedName, amount: parsedAmount)
+    }
+
+    /// Parse amount string into library Amount type
+    private func parseAmount(_ amountString: String) -> Amount? {
+        guard !amountString.isEmpty else { return nil }
+
+        let parts = amountString.split(separator: " ", maxSplits: 1)
+
+        if parts.count >= 2 {
+            // Has both quantity and unit
+            let quantityStr = String(parts[0])
+            let unit = String(parts[1])
+
+            if let quantity = parseQuantity(quantityStr) {
+                return Amount(quantity, unit: unit)
+            } else {
+                // Treat whole string as rawText
+                return Amount(amount: 0, unit: nil, rawText: amountString)
+            }
+        } else if parts.count == 1 {
+            let firstPart = String(parts[0])
+            if let quantity = parseQuantity(firstPart) {
+                return Amount(quantity, unit: nil)
+            } else {
+                // Might be just a unit like "pinch"
+                return Amount(amount: 0, unit: firstPart, rawText: firstPart)
+            }
+        }
+
+        return nil
+    }
+
+    /// Parse a quantity string (handles fractions)
+    private func parseQuantity(_ str: String) -> Double? {
+        // Handle fractions like "1/2"
+        if str.contains("/") {
+            let fractionParts = str.split(separator: "/")
+            if fractionParts.count == 2,
+               let numerator = Double(fractionParts[0]),
+               let denominator = Double(fractionParts[1]),
+               denominator != 0 {
+                return numerator / denominator
+            }
+        }
+        // Handle mixed numbers like "1 1/2" - already split, so just parse
+        return Double(str)
     }
 
     /// Check if this ingredient has valid content
@@ -78,7 +102,7 @@ struct EditableIngredient: Identifiable {
 /// Mode for the recipe form
 enum RecipeFormMode: Equatable {
     case add
-    case edit(Recipe)
+    case edit(RecipeFile)
 
     static func == (lhs: RecipeFormMode, rhs: RecipeFormMode) -> Bool {
         switch (lhs, rhs) {
@@ -120,8 +144,8 @@ class RecipeFormViewModel {
     var saveError: Error?
     var validationErrors: [RecipeValidationError] = []
 
-    /// Original recipe for edit mode (to detect changes)
-    private var originalRecipe: Recipe?
+    /// Original recipe file for edit mode (to detect changes)
+    private var originalRecipeFile: RecipeFile?
 
     /// Initial form state for change detection
     private var initialState: FormState?
@@ -131,9 +155,9 @@ class RecipeFormViewModel {
     init(mode: RecipeFormMode = .add) {
         self.mode = mode
 
-        if case .edit(let recipe) = mode {
-            self.originalRecipe = recipe
-            populateFromRecipe(recipe)
+        if case .edit(let recipeFile) = mode {
+            self.originalRecipeFile = recipeFile
+            populateFromRecipeFile(recipeFile)
         }
 
         // Capture initial state after population
@@ -235,8 +259,8 @@ class RecipeFormViewModel {
     /// - Parameters:
     ///   - folder: The folder to save in (for new recipes)
     ///   - store: The recipe store
-    /// - Returns: The saved recipe
-    func save(to folder: URL, using store: RecipeStore) async throws -> Recipe {
+    /// - Returns: The saved recipe file
+    func save(to folder: URL, using store: RecipeStore) async throws -> RecipeFile {
         guard validate() else {
             throw RecipeWriteError.serializationError
         }
@@ -245,18 +269,18 @@ class RecipeFormViewModel {
         saveError = nil
         defer { isSaving = false }
 
-        let recipe = buildRecipe()
+        let recipeFile = buildRecipeFile()
 
         do {
-            let savedRecipe: Recipe
+            let savedRecipeFile: RecipeFile
             switch mode {
             case .add:
-                savedRecipe = try await store.saveNewRecipe(recipe, in: folder)
+                savedRecipeFile = try await store.saveNewRecipe(recipeFile, in: folder)
             case .edit:
-                try await store.updateRecipe(recipe)
-                savedRecipe = recipe
+                try await store.updateRecipe(recipeFile)
+                savedRecipeFile = recipeFile
             }
-            return savedRecipe
+            return savedRecipeFile
         } catch {
             saveError = error
             throw error
@@ -265,16 +289,20 @@ class RecipeFormViewModel {
 
     // MARK: - Private Methods
 
-    /// Populate form fields from an existing recipe
-    private func populateFromRecipe(_ recipe: Recipe) {
+    /// Populate form fields from an existing recipe file
+    private func populateFromRecipeFile(_ recipeFile: RecipeFile) {
+        let recipe = recipeFile.recipe
+
         title = recipe.title
         descriptionText = recipe.description ?? ""
         tagsText = recipe.tags.joined(separator: ", ")
-        yieldsText = recipe.yields.joined(separator: ", ")
         instructions = recipe.instructions ?? ""
 
-        // Convert ingredients
-        let allIngredients = recipe.ingredients + recipe.ingredientGroups.flatMap { $0.ingredients }
+        // Format yields from Yield type
+        yieldsText = recipe.yield.formatted
+
+        // Convert ingredients from all groups
+        let allIngredients = recipe.ingredientGroups.flatMap { $0.allIngredients }
         if allIngredients.isEmpty {
             ingredients = [EditableIngredient()]
         } else {
@@ -282,29 +310,46 @@ class RecipeFormViewModel {
         }
     }
 
-    /// Build a Recipe from the current form state
-    private func buildRecipe() -> Recipe {
+    /// Build a RecipeFile from the current form state
+    private func buildRecipeFile() -> RecipeFile {
         // Parse tags from comma-separated string
         let tags = tagsText
             .split(separator: ",")
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
 
-        // Parse yields from comma-separated string
-        let yields = yieldsText
+        // Parse yields from comma-separated string into Yield type
+        let yieldAmounts = yieldsText
             .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
+            .compactMap { yieldStr -> Amount? in
+                let trimmed = yieldStr.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.isEmpty else { return nil }
+                return parseYieldAmount(trimmed)
+            }
+        let yield = Yield(amount: yieldAmounts)
 
-        // Convert editable ingredients to Ingredient models
+        // Convert editable ingredients to library Ingredient models
         let recipeIngredients = ingredients
             .filter { $0.isValid }
             .map { $0.toIngredient() }
 
+        // Create a single ingredient group with all ingredients
+        let ingredientGroup = IngredientGroup(ingredients: recipeIngredients)
+
+        // Build the library Recipe
+        let recipe = Recipe(
+            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            description: descriptionText.isEmpty ? nil : descriptionText,
+            tags: tags,
+            yield: yield,
+            ingredientGroups: [ingredientGroup],
+            instructions: instructions.isEmpty ? nil : instructions
+        )
+
         // Get file path from original recipe or use placeholder
         let filePath: URL
-        if case .edit(let recipe) = mode {
-            filePath = recipe.filePath
+        if case .edit(let originalFile) = mode {
+            filePath = originalFile.filePath
         } else {
             // Placeholder - will be replaced by RecipeStore.saveNewRecipe
             filePath = URL(fileURLWithPath: "/tmp/placeholder.md")
@@ -312,23 +357,40 @@ class RecipeFormViewModel {
 
         // Get ID from original recipe or generate new
         let id: UUID
-        if case .edit(let recipe) = mode {
-            id = recipe.id
+        if case .edit(let originalFile) = mode {
+            id = originalFile.id
         } else {
             id = UUID()
         }
 
-        return Recipe(
+        return RecipeFile(
             id: id,
             filePath: filePath,
-            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
-            description: descriptionText.isEmpty ? nil : descriptionText,
-            tags: tags,
-            yields: yields,
-            ingredients: recipeIngredients,
-            ingredientGroups: [],  // v1.0: flat list only
-            instructions: instructions.isEmpty ? nil : instructions
+            recipe: recipe,
+            fileModifiedDate: Date()
         )
+    }
+
+    /// Parse a yield amount string (e.g., "4 servings", "2 loaves")
+    private func parseYieldAmount(_ str: String) -> Amount {
+        let parts = str.split(separator: " ", maxSplits: 1)
+
+        if parts.count >= 2 {
+            let quantityStr = String(parts[0])
+            let unit = String(parts[1])
+
+            if let quantity = Double(quantityStr) {
+                return Amount(quantity, unit: unit)
+            }
+        } else if parts.count == 1 {
+            let firstPart = String(parts[0])
+            if let quantity = Double(firstPart) {
+                return Amount(quantity, unit: nil)
+            }
+        }
+
+        // Fall back to raw text
+        return Amount(amount: 0, unit: nil, rawText: str)
     }
 
     /// Current form state for change detection

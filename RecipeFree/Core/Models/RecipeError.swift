@@ -7,6 +7,30 @@
 
 import Foundation
 
+/// Errors that can occur during recipe parsing
+enum RecipeParseError: Error, LocalizedError {
+    case fileNotFound
+    case fileNotReadable
+    case invalidFormat(reason: String)
+    case missingTitle
+    case encodingError
+
+    var errorDescription: String? {
+        switch self {
+        case .fileNotFound:
+            return "Recipe file not found"
+        case .fileNotReadable:
+            return "Unable to read recipe file"
+        case .invalidFormat(let reason):
+            return "Invalid RecipeMD format: \(reason)"
+        case .missingTitle:
+            return "Recipe is missing a title"
+        case .encodingError:
+            return "File encoding error"
+        }
+    }
+}
+
 /// Errors that can occur when writing recipe files
 enum RecipeWriteError: LocalizedError {
     case folderNotAccessible

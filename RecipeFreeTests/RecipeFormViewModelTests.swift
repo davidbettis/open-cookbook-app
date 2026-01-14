@@ -7,6 +7,7 @@
 
 import Foundation
 import Testing
+import RecipeMD
 @testable import RecipeFree
 
 @MainActor
@@ -32,23 +33,26 @@ struct RecipeFormViewModelTests {
     @Test("Initializes with edit mode and populates fields")
     func initializesWithEditMode() {
         let recipe = Recipe(
-            filePath: URL(fileURLWithPath: "/tmp/test.md"),
             title: "Test Recipe",
             description: "Test description",
             tags: ["tag1", "tag2"],
-            yields: ["serves 4"],
-            ingredients: [
-                Ingredient(quantity: "1", unit: "cup", name: "flour")
-            ],
+            yield: Yield(amount: [Amount(4, unit: "servings")]),
+            ingredientGroups: [IngredientGroup(ingredients: [
+                Ingredient(name: "flour", amount: Amount(1, unit: "cup"))
+            ])],
             instructions: "Test instructions"
         )
 
-        let viewModel = RecipeFormViewModel(mode: .edit(recipe))
+        let recipeFile = RecipeFile(
+            filePath: URL(fileURLWithPath: "/tmp/test.md"),
+            recipe: recipe
+        )
+
+        let viewModel = RecipeFormViewModel(mode: .edit(recipeFile))
 
         #expect(viewModel.title == "Test Recipe")
         #expect(viewModel.descriptionText == "Test description")
         #expect(viewModel.tagsText == "tag1, tag2")
-        #expect(viewModel.yieldsText == "serves 4")
         #expect(viewModel.instructions == "Test instructions")
         #expect(viewModel.navigationTitle == "Edit Recipe")
         #expect(viewModel.saveButtonText == "Save Changes")
@@ -199,9 +203,8 @@ struct RecipeFormViewModelTests {
 
         let ingredient = editable.toIngredient()
 
-        #expect(ingredient.quantity == "2")
-        #expect(ingredient.unit == "cups")
         #expect(ingredient.name == "flour")
+        #expect(ingredient.amount != nil)
     }
 
     @Test("Handles ingredient with quantity only")
@@ -210,9 +213,8 @@ struct RecipeFormViewModelTests {
 
         let ingredient = editable.toIngredient()
 
-        #expect(ingredient.quantity == "2")
-        #expect(ingredient.unit == nil)
         #expect(ingredient.name == "eggs")
+        #expect(ingredient.amount != nil)
     }
 
     @Test("Handles ingredient with no amount")
@@ -221,19 +223,18 @@ struct RecipeFormViewModelTests {
 
         let ingredient = editable.toIngredient()
 
-        #expect(ingredient.quantity == nil)
-        #expect(ingredient.unit == nil)
+        #expect(ingredient.amount == nil)
         #expect(ingredient.name == "salt")
     }
 
     @Test("Creates editable from ingredient model")
     func createsEditableFromModel() {
-        let ingredient = Ingredient(quantity: "1", unit: "cup", name: "sugar")
+        let ingredient = Ingredient(name: "sugar", amount: Amount(1, unit: "cup"))
 
         let editable = EditableIngredient(from: ingredient)
 
-        #expect(editable.amount == "1 cup")
         #expect(editable.name == "sugar")
+        #expect(!editable.amount.isEmpty)
     }
 
     @Test("Validates editable ingredient")

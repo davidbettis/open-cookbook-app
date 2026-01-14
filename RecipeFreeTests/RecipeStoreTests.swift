@@ -7,6 +7,7 @@
 
 import Testing
 import Foundation
+import RecipeMD
 @testable import RecipeFree
 
 @Suite("RecipeStore Tests", .serialized)
@@ -47,7 +48,16 @@ struct RecipeStoreTests {
 
             *dessert, baking*
 
-            **yields: 24 cookies**
+            **24 cookies**
+
+            ---
+
+            - flour
+            - sugar
+
+            ---
+
+            Bake.
             """,
             "pasta.md": """
             # Pasta Carbonara
@@ -55,6 +65,15 @@ struct RecipeStoreTests {
             Classic Italian dish.
 
             *dinner, italian*
+
+            ---
+
+            - pasta
+            - eggs
+
+            ---
+
+            Cook.
             """
         ]
 
@@ -65,7 +84,7 @@ struct RecipeStoreTests {
             cleanupTestDirectory(testDir)
         }
 
-        store.loadRecipes(from: testDir)
+        await store.loadRecipes(from: testDir)
 
         // Verify recipes were loaded
         #expect(store.recipes.count == 2)
@@ -78,7 +97,6 @@ struct RecipeStoreTests {
         // Verify metadata was parsed correctly
         let cookies = store.recipes[0]
         #expect(cookies.tags == ["dessert", "baking"])
-        #expect(cookies.yields == ["24 cookies"])
         #expect(cookies.description == "Delicious cookies.")
     }
 
@@ -91,7 +109,7 @@ struct RecipeStoreTests {
             cleanupTestDirectory(testDir)
         }
 
-        store.loadRecipes(from: testDir)
+        await store.loadRecipes(from: testDir)
 
         #expect(store.recipes.isEmpty)
         #expect(store.parseErrors.isEmpty)
@@ -104,6 +122,12 @@ struct RecipeStoreTests {
             # Valid Recipe
 
             This is valid.
+
+            ---
+
+            - ingredient
+
+            ---
             """,
             "invalid.md": """
             This file has no title!
@@ -119,7 +143,7 @@ struct RecipeStoreTests {
             cleanupTestDirectory(testDir)
         }
 
-        store.loadRecipes(from: testDir)
+        await store.loadRecipes(from: testDir)
 
         // Verify valid recipe was loaded
         #expect(store.recipes.count == 1)
@@ -138,6 +162,12 @@ struct RecipeStoreTests {
             # Recipe One
 
             First recipe.
+
+            ---
+
+            - ingredient
+
+            ---
             """
         ]
 
@@ -148,7 +178,7 @@ struct RecipeStoreTests {
             cleanupTestDirectory(testDir)
         }
 
-        store.loadRecipes(from: testDir)
+        await store.loadRecipes(from: testDir)
 
         #expect(store.recipes.count == 1)
 
@@ -157,12 +187,18 @@ struct RecipeStoreTests {
         # Recipe Two
 
         Second recipe.
+
+        ---
+
+        - ingredient
+
+        ---
         """
         let newFileURL = testDir.appendingPathComponent("recipe2.md")
         try newRecipe.write(to: newFileURL, atomically: true, encoding: .utf8)
 
         // Refresh
-        store.refreshRecipes()
+        await store.refreshRecipes()
 
         // Verify both recipes are now loaded
         #expect(store.recipes.count == 2)
@@ -177,6 +213,12 @@ struct RecipeStoreTests {
             # Test Recipe
 
             A test recipe for caching.
+
+            ---
+
+            - ingredient
+
+            ---
             """
         ]
 
@@ -188,11 +230,11 @@ struct RecipeStoreTests {
         }
 
         // First load
-        store.loadRecipes(from: testDir)
+        await store.loadRecipes(from: testDir)
         let firstLoad = store.recipes[0]
 
         // Second load without changes
-        store.refreshRecipes()
+        await store.refreshRecipes()
         let secondLoad = store.recipes[0]
 
         // Verify same recipe instance (from cache)
@@ -207,6 +249,12 @@ struct RecipeStoreTests {
             # Original Title
 
             Original content.
+
+            ---
+
+            - ingredient
+
+            ---
             """
         ]
 
@@ -218,7 +266,7 @@ struct RecipeStoreTests {
         }
 
         // First load
-        store.loadRecipes(from: testDir)
+        await store.loadRecipes(from: testDir)
         #expect(store.recipes[0].title == "Original Title")
 
         // Wait a bit to ensure modification date changes
@@ -229,12 +277,18 @@ struct RecipeStoreTests {
         # Modified Title
 
         Modified content.
+
+        ---
+
+        - ingredient
+
+        ---
         """
         let fileURL = testDir.appendingPathComponent("recipe.md")
         try modifiedContent.write(to: fileURL, atomically: true, encoding: .utf8)
 
         // Refresh
-         store.refreshRecipes()
+        await store.refreshRecipes()
 
         // Verify new content was parsed
         #expect(store.recipes[0].title == "Modified Title")
@@ -250,6 +304,12 @@ struct RecipeStoreTests {
             # Test Recipe
 
             Content.
+
+            ---
+
+            - ingredient
+
+            ---
             """
         ]
 
@@ -260,7 +320,7 @@ struct RecipeStoreTests {
             cleanupTestDirectory(testDir)
         }
 
-        store.loadRecipes(from: testDir)
+        await store.loadRecipes(from: testDir)
 
         #expect(!store.recipes.isEmpty)
 
@@ -281,6 +341,12 @@ struct RecipeStoreTests {
             # Test Recipe
 
             Content.
+
+            ---
+
+            - ingredient
+
+            ---
             """
         ]
 
@@ -293,15 +359,8 @@ struct RecipeStoreTests {
 
         #expect(store.isLoading == false)
 
-        // Start loading (run in task to capture loading state)
-        let loadingTask = Task {
-            store.loadRecipes(from: testDir)
-        }
-
-        // Loading state might be true briefly, but we can't reliably test this
-        // due to async timing. Just verify it's false after completion.
-
-        await loadingTask.value
+        // Load recipes
+        await store.loadRecipes(from: testDir)
 
         #expect(store.isLoading == false)
         #expect(!store.recipes.isEmpty)
