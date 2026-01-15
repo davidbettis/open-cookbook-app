@@ -64,6 +64,12 @@ struct RecipeListSplitView: View {
         .onChange(of: viewModel.recipeStore.recipes) { _, _ in
             viewModel.syncSearchService()
         }
+        .onChange(of: selectedRecipeFile) { _, newValue in
+            if newValue != nil {
+                columnVisibility = .detailOnly
+            }
+        }
+        .navigationSplitViewStyle(.prominentDetail)
     }
 
     // MARK: - Subviews
@@ -193,7 +199,7 @@ struct RecipeListSplitView: View {
     @ViewBuilder
     private var detailContent: some View {
         if let recipeFile = selectedRecipeFile {
-            RecipeDetailView(recipeFile: recipeFile)
+            RecipeDetailView(recipeFile: recipeFile, recipeStore: viewModel.recipeStore)
         } else {
             // No selection
             ContentUnavailableView(

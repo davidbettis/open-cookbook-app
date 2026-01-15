@@ -8,7 +8,7 @@
 import RecipeMD
 import SwiftUI
 
-/// Displays recipe header content matching the MarkdownUI recipe theme
+/// Displays recipe header content (title, description, tags, yields)
 struct RecipeHeaderView: View {
     let title: String
     let description: String?

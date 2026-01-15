@@ -53,7 +53,6 @@ struct RecipeDetailView: View {
                 }
             }
         }
-        .navigationTitle(recipeFile.title)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {

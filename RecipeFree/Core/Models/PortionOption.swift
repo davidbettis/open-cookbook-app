@@ -15,9 +15,9 @@ struct PortionOption: Identifiable, Hashable, Equatable {
 
     // MARK: - Preset Options
 
-    static let half = PortionOption(id: "half", label: "Half (0.5x)", multiplier: 0.5)
-    static let whole = PortionOption(id: "whole", label: "Whole (1x)", multiplier: 1.0)
-    static let double = PortionOption(id: "double", label: "Double (2x)", multiplier: 2.0)
+    static let half = PortionOption(id: "half", label: "0.5x", multiplier: 0.5)
+    static let whole = PortionOption(id: "whole", label: "1x", multiplier: 1.0)
+    static let double = PortionOption(id: "double", label: "2x", multiplier: 2.0)
 
     /// All available portion options in display order
     static let allOptions: [PortionOption] = [.half, .whole, .double]

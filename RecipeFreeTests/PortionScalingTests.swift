@@ -24,9 +24,9 @@ struct PortionScalingTests {
 
     @Test("PortionOption has correct labels")
     func portionOptionLabels() {
-        #expect(PortionOption.half.label == "Half (0.5x)")
-        #expect(PortionOption.whole.label == "Whole (1x)")
-        #expect(PortionOption.double.label == "Double (2x)")
+        #expect(PortionOption.half.label == "0.5x")
+        #expect(PortionOption.whole.label == "1x")
+        #expect(PortionOption.double.label == "2x")
     }
 
     @Test("PortionOption allOptions contains all three options")
