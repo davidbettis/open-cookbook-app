@@ -56,17 +56,11 @@ struct RecipeDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                // Share button
-                if let content = markdownContent {
-                    ShareLink(
-                        item: content,
-                        subject: Text(recipeFile.title),
-                        message: Text("Check out this recipe!")
-                    ) {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                    .accessibilityLabel("Share Recipe")
+                // Share button - shares the file like Files app
+                ShareLink(item: currentRecipeFile?.filePath ?? recipeFile.filePath) {
+                    Image(systemName: "square.and.arrow.up")
                 }
+                .accessibilityLabel("Share Recipe")
 
                 // Edit button
                 if recipeStore != nil {

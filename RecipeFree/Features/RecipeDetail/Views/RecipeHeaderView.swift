@@ -20,7 +20,7 @@ struct RecipeHeaderView: View {
         VStack(alignment: .leading, spacing: 12) {
             // Title
             Text(title)
-                .font(.largeTitle)
+                .font(.title2)
                 .fontWeight(.bold)
                 .foregroundStyle(.primary)
                 .accessibilityAddTraits(.isHeader)

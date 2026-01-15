@@ -18,6 +18,7 @@ struct RecipeListSplitView: View {
     @State private var selectedRecipeFile: RecipeFile?
     @State private var selectedError: (URL, Error)?
     @State private var showErrorAlert = false
+    @State private var showAddRecipe = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     // MARK: - Initialization
@@ -37,7 +38,7 @@ struct RecipeListSplitView: View {
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {
                         Button {
-                            // TODO: Add recipe action (F005)
+                            showAddRecipe = true
                         } label: {
                             Image(systemName: "plus")
                         }
@@ -70,6 +71,15 @@ struct RecipeListSplitView: View {
             }
         }
         .navigationSplitViewStyle(.prominentDetail)
+        .sheet(isPresented: $showAddRecipe) {
+            RecipeFormView(
+                viewModel: RecipeFormViewModel(mode: .add),
+                recipeStore: viewModel.recipeStore,
+                onSave: { _ in
+                    viewModel.syncSearchService()
+                }
+            )
+        }
     }
 
     // MARK: - Subviews

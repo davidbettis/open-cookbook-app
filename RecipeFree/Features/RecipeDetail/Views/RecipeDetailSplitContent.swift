@@ -40,21 +40,10 @@ struct RecipeDetailSplitContent: View {
 
     private var ingredientsPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Section header
-            Text("Ingredients")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.systemBackground))
-                .accessibilityAddTraits(.isHeader)
-
             // Portion selector
             PortionSelectorView(selectedPortion: $selectedPortion)
                 .padding(.horizontal, 16)
-                .padding(.bottom, 8)
+                .padding(.vertical, 12)
 
             Divider()
 
@@ -75,32 +64,16 @@ struct RecipeDetailSplitContent: View {
     // MARK: - Instructions Panel
 
     private var instructionsPanel: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Section header
-            Text("Instructions")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.systemBackground))
-                .accessibilityAddTraits(.isHeader)
-
-            Divider()
-
-            // Scrollable instructions
-            ScrollView {
-                if let instructions = instructions, !instructions.isEmpty {
-                    Markdown(instructions)
-                        .markdownTheme(.recipe)
-                        .padding(16)
-                } else {
-                    Text("No instructions provided")
-                        .foregroundStyle(.secondary)
-                        .italic()
-                        .padding(16)
-                }
+        ScrollView {
+            if let instructions = instructions, !instructions.isEmpty {
+                Markdown(instructions)
+                    .markdownTheme(.recipe)
+                    .padding(16)
+            } else {
+                Text("No instructions provided")
+                    .foregroundStyle(.secondary)
+                    .italic()
+                    .padding(16)
             }
         }
         .accessibilityElement(children: .contain)
