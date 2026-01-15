@@ -32,6 +32,11 @@ struct RecipeLibraryContainerView: View {
             }
         }
         .environment(recipeStore)
+        .onAppear {
+            if let folderURL = folderManager.selectedFolderURL {
+                recipeStore.loadRecipes(from: folderURL)
+            }
+        }
     }
 }
 
