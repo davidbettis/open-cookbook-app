@@ -37,6 +37,7 @@ enum RecipeWriteError: LocalizedError {
     case invalidFilename
     case writeError(underlying: Error)
     case serializationError
+    case fileModifiedExternally
 
     var errorDescription: String? {
         switch self {
@@ -48,6 +49,8 @@ enum RecipeWriteError: LocalizedError {
             return "Failed to save recipe: \(error.localizedDescription)"
         case .serializationError:
             return "Failed to convert recipe to markdown format."
+        case .fileModifiedExternally:
+            return "This recipe was modified outside the app since you started editing."
         }
     }
 }

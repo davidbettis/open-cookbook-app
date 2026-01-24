@@ -245,4 +245,200 @@ struct RecipeFormViewModelTests {
         #expect(valid.isValid == true)
         #expect(invalid.isValid == false)
     }
+
+    // MARK: - Conflict Detection Tests
+
+    @Test("No external modification in add mode")
+    func noExternalModificationInAddMode() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+
+        #expect(viewModel.checkForExternalModification() == false)
+    }
+
+    @Test("No external modification when file unchanged")
+    func noExternalModificationWhenFileUnchanged() throws {
+        // Create a temporary file
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("conflict-test-unchanged-\(UUID().uuidString).md")
+
+        let content = """
+        # Test Recipe
+
+        ---
+
+        - flour
+
+        ---
+
+        Instructions here.
+        """
+        try content.write(to: testFile, atomically: true, encoding: .utf8)
+
+        defer {
+            try? FileManager.default.removeItem(at: testFile)
+        }
+
+        // Get the file's modification date
+        let attributes = try FileManager.default.attributesOfItem(atPath: testFile.path)
+        let modDate = attributes[.modificationDate] as? Date
+
+        let recipe = Recipe(
+            title: "Test Recipe",
+            ingredientGroups: [IngredientGroup(ingredients: [Ingredient(name: "flour")])]
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: testFile,
+            recipe: recipe,
+            fileModifiedDate: modDate
+        )
+
+        let viewModel = RecipeFormViewModel(mode: .edit(recipeFile))
+
+        #expect(viewModel.checkForExternalModification() == false)
+    }
+
+    @Test("Detects external modification when file changed")
+    func detectsExternalModificationWhenFileChanged() throws {
+        // Create a temporary file
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("conflict-test-changed-\(UUID().uuidString).md")
+
+        let content = """
+        # Test Recipe
+
+        ---
+
+        - flour
+
+        ---
+
+        Instructions here.
+        """
+        try content.write(to: testFile, atomically: true, encoding: .utf8)
+
+        defer {
+            try? FileManager.default.removeItem(at: testFile)
+        }
+
+        // Create recipe file with an OLD modification date (simulating loading earlier)
+        let oldDate = Date(timeIntervalSinceNow: -60) // 1 minute ago
+
+        let recipe = Recipe(
+            title: "Test Recipe",
+            ingredientGroups: [IngredientGroup(ingredients: [Ingredient(name: "flour")])]
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: testFile,
+            recipe: recipe,
+            fileModifiedDate: oldDate
+        )
+
+        let viewModel = RecipeFormViewModel(mode: .edit(recipeFile))
+
+        // The file on disk has a newer modification date than what we stored
+        #expect(viewModel.checkForExternalModification() == true)
+    }
+
+    @Test("Save throws error when file modified externally")
+    func saveThrowsErrorWhenFileModifiedExternally() async throws {
+        // Create a temporary file
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("conflict-test-save-\(UUID().uuidString).md")
+
+        let content = """
+        # Test Recipe
+
+        ---
+
+        - flour
+
+        ---
+
+        Instructions here.
+        """
+        try content.write(to: testFile, atomically: true, encoding: .utf8)
+
+        defer {
+            try? FileManager.default.removeItem(at: testFile)
+        }
+
+        // Create recipe file with an OLD modification date
+        let oldDate = Date(timeIntervalSinceNow: -60)
+
+        let recipe = Recipe(
+            title: "Test Recipe",
+            ingredientGroups: [IngredientGroup(ingredients: [Ingredient(name: "flour")])]
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: testFile,
+            recipe: recipe,
+            fileModifiedDate: oldDate
+        )
+
+        let viewModel = RecipeFormViewModel(mode: .edit(recipeFile))
+        viewModel.title = "Test Recipe"
+        viewModel.ingredients = [EditableIngredient(amount: "", name: "flour")]
+
+        let store = RecipeStore()
+
+        do {
+            _ = try await viewModel.save(to: tempDir, using: store, forceOverwrite: false)
+            Issue.record("Expected fileModifiedExternally error to be thrown")
+        } catch RecipeWriteError.fileModifiedExternally {
+            // Expected error
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+    }
+
+    @Test("Save succeeds with forceOverwrite when file modified externally")
+    func saveSucceedsWithForceOverwrite() async throws {
+        // Create a temporary file
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("conflict-test-force-\(UUID().uuidString).md")
+
+        let content = """
+        # Test Recipe
+
+        ---
+
+        - flour
+
+        ---
+
+        Instructions here.
+        """
+        try content.write(to: testFile, atomically: true, encoding: .utf8)
+
+        defer {
+            try? FileManager.default.removeItem(at: testFile)
+        }
+
+        // Create recipe file with an OLD modification date
+        let oldDate = Date(timeIntervalSinceNow: -60)
+
+        let recipe = Recipe(
+            title: "Test Recipe",
+            ingredientGroups: [IngredientGroup(ingredients: [Ingredient(name: "flour")])]
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: testFile,
+            recipe: recipe,
+            fileModifiedDate: oldDate
+        )
+
+        let viewModel = RecipeFormViewModel(mode: .edit(recipeFile))
+        viewModel.title = "Test Recipe"
+        viewModel.ingredients = [EditableIngredient(amount: "", name: "flour")]
+
+        let store = RecipeStore()
+
+        // Should succeed with forceOverwrite: true
+        let savedRecipe = try await viewModel.save(to: tempDir, using: store, forceOverwrite: true)
+        #expect(savedRecipe.title == "Test Recipe")
+    }
 }

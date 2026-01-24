@@ -19,6 +19,7 @@ struct RecipeFormView: View {
 
     @State private var showCancelConfirmation = false
     @State private var showErrorAlert = false
+    @State private var showConflictAlert = false
 
     // MARK: - Initialization
 
@@ -122,7 +123,7 @@ struct RecipeFormView: View {
                 // Instructions Section
                 Section("Instructions") {
                     TextEditor(text: $viewModel.instructions)
-                        .frame(minHeight: 150)
+                        .frame(minHeight: 300)
                         .accessibilityLabel("Recipe instructions")
                         .accessibilityHint("Enter step-by-step cooking instructions")
                 }
@@ -139,7 +140,7 @@ struct RecipeFormView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button(viewModel.saveButtonText) {
                         Task {
-                            await handleSave()
+                            await handleSave(forceOverwrite: false)
                         }
                     }
                     .disabled(viewModel.isSaving)
@@ -168,6 +169,16 @@ struct RecipeFormView: View {
                 if let error = viewModel.saveError {
                     Text(error.localizedDescription)
                 }
+            }
+            .alert("Recipe Modified Externally", isPresented: $showConflictAlert) {
+                Button("Overwrite", role: .destructive) {
+                    Task {
+                        await handleSave(forceOverwrite: true)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This recipe was changed outside the app (possibly on another device). Do you want to overwrite those changes with your version?")
             }
         }
     }
@@ -201,7 +212,7 @@ struct RecipeFormView: View {
         }
     }
 
-    private func handleSave() async {
+    private func handleSave(forceOverwrite: Bool = false) async {
         guard let folder = folderManager.selectedFolderURL else {
             viewModel.saveError = RecipeWriteError.folderNotAccessible
             showErrorAlert = true
@@ -209,9 +220,11 @@ struct RecipeFormView: View {
         }
 
         do {
-            let savedRecipeFile = try await viewModel.save(to: folder, using: recipeStore)
+            let savedRecipeFile = try await viewModel.save(to: folder, using: recipeStore, forceOverwrite: forceOverwrite)
             onSave?(savedRecipeFile)
             dismiss()
+        } catch RecipeWriteError.fileModifiedExternally {
+            showConflictAlert = true
         } catch {
             showErrorAlert = true
         }

@@ -255,14 +255,48 @@ class RecipeFormViewModel {
         return validationErrors.isEmpty
     }
 
+    /// Check if the file was modified externally since we loaded it
+    /// - Returns: true if the file was modified externally
+    func checkForExternalModification() -> Bool {
+        guard case .edit(let originalFile) = mode,
+              let originalDate = originalFile.fileModifiedDate else {
+            return false
+        }
+
+        let fileURL = originalFile.filePath
+
+        // Start accessing security-scoped resource if needed
+        let didStartAccess = fileURL.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccess {
+                fileURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        // Get current file modification date
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+              let currentDate = attributes[.modificationDate] as? Date else {
+            return false
+        }
+
+        // Compare dates (allow 1 second tolerance for filesystem precision)
+        return abs(currentDate.timeIntervalSince(originalDate)) > 1.0
+    }
+
     /// Save the recipe
     /// - Parameters:
     ///   - folder: The folder to save in (for new recipes)
     ///   - store: The recipe store
+    ///   - forceOverwrite: If true, skip conflict check and overwrite
     /// - Returns: The saved recipe file
-    func save(to folder: URL, using store: RecipeStore) async throws -> RecipeFile {
+    func save(to folder: URL, using store: RecipeStore, forceOverwrite: Bool = false) async throws -> RecipeFile {
         guard validate() else {
             throw RecipeWriteError.serializationError
+        }
+
+        // Check for external modifications in edit mode (unless force overwrite)
+        if !forceOverwrite && checkForExternalModification() {
+            throw RecipeWriteError.fileModifiedExternally
         }
 
         isSaving = true
