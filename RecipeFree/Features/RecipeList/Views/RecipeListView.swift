@@ -93,9 +93,16 @@ struct RecipeListView: View {
                     recipeListWithSearch
                 }
             }
-            .navigationTitle("Recipe Library")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Image("AppIconSmall")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 40, height: 40)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .accessibilityLabel("Recipe Free")
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         showAddRecipe = true

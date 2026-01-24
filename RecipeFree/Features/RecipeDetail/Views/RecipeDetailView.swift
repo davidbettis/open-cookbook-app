@@ -55,6 +55,18 @@ struct RecipeDetailView: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            // Centered app icon (iPad/macOS only)
+            if horizontalSizeClass == .regular {
+                ToolbarItem(placement: .principal) {
+                    Image("AppIconSmall")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 40, height: 40)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .accessibilityLabel("Recipe Free")
+                }
+            }
+
             ToolbarItemGroup(placement: .primaryAction) {
                 // Share button - shares the file like Files app
                 ShareLink(item: currentRecipeFile?.filePath ?? recipeFile.filePath) {
