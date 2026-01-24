@@ -93,7 +93,8 @@ struct RecipeListView: View {
                     recipeListWithSearch
                 }
             }
-            .navigationTitle("Recipes")
+            .navigationTitle("Recipe Library")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {

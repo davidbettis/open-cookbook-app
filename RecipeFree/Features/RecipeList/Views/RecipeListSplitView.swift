@@ -33,7 +33,8 @@ struct RecipeListSplitView: View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             // Sidebar - Recipe List
             sidebarContent
-                .navigationTitle("Recipes")
+                .navigationTitle("Recipe Library")
+                .navigationBarTitleDisplayMode(.inline)
                 .navigationSplitViewColumnWidth(min: 300, ideal: 350, max: 500)
                 .toolbar {
                     ToolbarItem(placement: .primaryAction) {

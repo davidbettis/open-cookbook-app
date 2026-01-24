@@ -21,11 +21,17 @@ struct RecipeDetailContent: View {
 
     var body: some View {
         Group {
-            if horizontalSizeClass == .regular {
-                // iPad: Header + Split content
+            #if os(macOS)
+            let useWideLayout = true
+            #else
+            let useWideLayout = horizontalSizeClass == .regular
+            #endif
+
+            if useWideLayout {
+                // iPad/macOS: Header + Split content with yield in ingredients pane
                 iPadLayout
             } else {
-                // iPhone: Structured layout with portion scaling
+                // iPhone: Structured layout with yield under title
                 iPhoneLayout
             }
         }
@@ -39,12 +45,12 @@ struct RecipeDetailContent: View {
 
     private var iPadLayout: some View {
         VStack(spacing: 0) {
-            // Full-width header with scaled yields
+            // Full-width header (without yield - it's shown in ingredients pane)
             RecipeHeaderView(
                 title: recipeFile.title,
                 description: recipeFile.description,
                 tags: recipeFile.tags,
-                yield: recipeFile.yield,
+                yield: Yield(amount: []),
                 portionMultiplier: selectedPortion.multiplier
             )
             .padding(16)
@@ -52,10 +58,11 @@ struct RecipeDetailContent: View {
 
             Divider()
 
-            // Split ingredients/instructions with portion selector
+            // Split ingredients/instructions with yield and portion selector
             RecipeDetailSplitContent(
                 ingredientGroups: recipeFile.ingredientGroups,
                 instructions: recipeFile.instructions,
+                yield: recipeFile.yield,
                 selectedPortion: $selectedPortion
             )
         }

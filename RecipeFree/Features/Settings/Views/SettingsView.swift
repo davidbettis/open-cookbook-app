@@ -25,9 +25,9 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Recipe Folder")
                             .font(.headline)
-                        if let url = folderManager.selectedFolderURL {
-                            Text(url.path)
-                                .font(.caption)
+                        if let displayName = folderManager.selectedFolderDisplayName {
+                            Label(displayName, systemImage: folderManager.isCloudFolder ? "icloud" : "folder")
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
                                 .lineLimit(2)
                         } else {
@@ -46,6 +46,7 @@ struct SettingsView: View {
                     Text("Storage")
                 }
 
+                #if DEBUG
                 Section {
                     Button {
                         loadSampleRecipes()
@@ -65,6 +66,7 @@ struct SettingsView: View {
                 } footer: {
                     Text("Add 5 sample recipes in RecipeMD format to your selected folder for testing.")
                 }
+                #endif
 
                 Section {
                     HStack {

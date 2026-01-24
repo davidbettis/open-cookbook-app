@@ -15,6 +15,7 @@ import SwiftUI
 struct RecipeDetailSplitContent: View {
     let ingredientGroups: [IngredientGroup]
     let instructions: String?
+    let yield: Yield
     @Binding var selectedPortion: PortionOption
 
     /// Proportion of width for ingredients panel
@@ -40,12 +41,39 @@ struct RecipeDetailSplitContent: View {
 
     private var ingredientsPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Portion selector
-            PortionSelectorView(selectedPortion: $selectedPortion)
+            // Section header
+            Text("Ingredients")
+                .font(.title2)
+                .fontWeight(.bold)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.top, 16)
+                .padding(.bottom, 8)
 
-            Divider()
+            // Yield and portion selector on same line
+            HStack {
+                // Scaled yield (left-aligned)
+                let scaledYield = yield.formattedScaled(by: selectedPortion.multiplier)
+                if !scaledYield.isEmpty {
+                    Text(scaledYield)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                // Portion picker (right-aligned, no label)
+                Picker("Portion size", selection: $selectedPortion) {
+                    ForEach(PortionOption.allOptions) { option in
+                        Text(option.label).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .accessibilityLabel("Portion size")
+                .accessibilityHint("Select portion multiplier for ingredient quantities")
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
 
             // Scrollable ingredients list
             ScrollView {
@@ -65,16 +93,24 @@ struct RecipeDetailSplitContent: View {
 
     private var instructionsPanel: some View {
         ScrollView {
-            if let instructions = instructions, !instructions.isEmpty {
-                Markdown(instructions)
-                    .markdownTheme(.recipe)
-                    .padding(16)
-            } else {
-                Text("No instructions provided")
-                    .foregroundStyle(.secondary)
-                    .italic()
-                    .padding(16)
+            VStack(alignment: .leading, spacing: 0) {
+                // Section header
+                Text("Instructions")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .padding(.bottom, 12)
+
+                if let instructions = instructions, !instructions.isEmpty {
+                    Markdown(instructions)
+                        .markdownTheme(.recipe)
+                } else {
+                    Text("No instructions provided")
+                        .foregroundStyle(.secondary)
+                        .italic()
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(16)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Instructions")
@@ -117,6 +153,7 @@ struct RecipeDetailSplitContent: View {
                 8. Bake for 10-12 minutes until golden brown
                 9. Cool on baking sheet for 2 minutes before transferring
                 """,
+                yield: Yield(amount: [Amount(24, unit: "cookies")]),
                 selectedPortion: $portion
             )
             .frame(height: 500)
@@ -138,6 +175,7 @@ struct RecipeDetailSplitContent: View {
                     ])
                 ],
                 instructions: nil,
+                yield: Yield(amount: [Amount(4, unit: "servings")]),
                 selectedPortion: $portion
             )
             .frame(height: 400)

@@ -38,6 +38,52 @@ final class FolderManager {
     /// The currently selected folder URL
     var selectedFolderURL: URL?
 
+    /// A user-friendly description of the selected folder location
+    var selectedFolderDisplayName: String? {
+        guard let url = selectedFolderURL else { return nil }
+
+        let path = url.path
+
+        // Check for iCloud Drive paths
+        // iOS: ~/Library/Mobile Documents/com~apple~CloudDocs/
+        // macOS: ~/Library/Mobile Documents/com~apple~CloudDocs/
+        if path.contains("com~apple~CloudDocs") {
+            // Extract the relative path after CloudDocs
+            if let range = path.range(of: "com~apple~CloudDocs/") {
+                let relativePath = String(path[range.upperBound...])
+                if relativePath.isEmpty {
+                    return "iCloud Drive"
+                }
+                return "iCloud Drive › \(relativePath)"
+            } else if path.hasSuffix("com~apple~CloudDocs") {
+                return "iCloud Drive"
+            }
+        }
+
+        // Check for other Mobile Documents paths (third-party app containers)
+        if path.contains("Mobile Documents") {
+            return "iCloud Drive › \(url.lastPathComponent)"
+        }
+
+        // Local storage - show just the folder name with device indicator
+        #if os(macOS)
+        return "On My Mac › \(url.lastPathComponent)"
+        #else
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            return "On My iPad › \(url.lastPathComponent)"
+        } else {
+            return "On My iPhone › \(url.lastPathComponent)"
+        }
+        #endif
+    }
+
+    /// Whether the selected folder is in iCloud Drive
+    var isCloudFolder: Bool {
+        guard let url = selectedFolderURL else { return false }
+        let path = url.path
+        return path.contains("com~apple~CloudDocs") || path.contains("Mobile Documents")
+    }
+
     /// Bookmark data for security-scoped resource access
     var folderBookmark: Data?
 
@@ -45,6 +91,21 @@ final class FolderManager {
     var isFirstLaunch: Bool {
         !hasSelectedFolder()
     }
+
+    /// Whether the app is running on macOS (including iOS apps on Mac)
+    private var isRunningOnMac: Bool {
+        #if os(macOS)
+        return true
+        #else
+        if #available(iOS 14.0, *) {
+            return ProcessInfo.processInfo.isiOSAppOnMac
+        }
+        return false
+        #endif
+    }
+
+    /// Whether we're currently accessing the security-scoped resource
+    private var isAccessingSecurityScopedResource = false
 
     // MARK: - Initialization
 
@@ -68,14 +129,40 @@ final class FolderManager {
     /// - Parameter url: The folder URL to save
     /// - Throws: Error if bookmark creation or save fails
     func saveFolder(_ url: URL) throws {
-        let bookmarkData = try url.bookmarkData(
-            options: .minimalBookmark,
+        let bookmarkData: Data
+        #if os(macOS)
+        // Native macOS app
+        bookmarkData = try url.bookmarkData(
+            options: [.withSecurityScope],
             includingResourceValuesForKeys: nil,
             relativeTo: nil
         )
+        #else
+        // iOS app - use different options when running on Mac vs iPhone/iPad
+        if isRunningOnMac {
+            // iOS app running on Mac needs security scope for proper file access
+            bookmarkData = try url.bookmarkData(
+                options: [],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+        } else {
+            bookmarkData = try url.bookmarkData(
+                options: .minimalBookmark,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+        }
+        #endif
         UserDefaults.standard.set(bookmarkData, forKey: "selectedFolderBookmark")
         self.selectedFolderURL = url
         self.folderBookmark = bookmarkData
+
+        // Start accessing security-scoped resource to maintain access
+        // after the document picker's defer block stops its access
+        if url.startAccessingSecurityScopedResource() {
+            isAccessingSecurityScopedResource = true
+        }
     }
 
     /// Loads the previously saved folder URL from UserDefaults
@@ -89,18 +176,45 @@ final class FolderManager {
 
         do {
             var isStale = false
-            let url = try URL(
+            let url: URL
+            #if os(macOS)
+            // Native macOS app
+            url = try URL(
                 resolvingBookmarkData: bookmarkData,
-                options: .withoutUI,
+                options: [.withSecurityScope],
                 relativeTo: nil,
                 bookmarkDataIsStale: &isStale
             )
+            #else
+            // iOS app - use different options when running on Mac vs iPhone/iPad
+            if isRunningOnMac {
+                url = try URL(
+                    resolvingBookmarkData: bookmarkData,
+                    options: [],
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                )
+            } else {
+                url = try URL(
+                    resolvingBookmarkData: bookmarkData,
+                    options: .withoutUI,
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                )
+            }
+            #endif
+
+            // Start accessing security-scoped resource (required on macOS)
+            if url.startAccessingSecurityScopedResource() {
+                isAccessingSecurityScopedResource = true
+            }
 
             // Verify the folder still exists
             var isDirectory: ObjCBool = false
             guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
                   isDirectory.boolValue else {
                 // Folder no longer exists, clear the bookmark
+                stopAccessingFolder()
                 clearSavedFolder()
                 throw FolderError.folderNotFound
             }
@@ -133,9 +247,18 @@ final class FolderManager {
 
     /// Clears the saved folder selection
     func clearSavedFolder() {
+        stopAccessingFolder()
         UserDefaults.standard.removeObject(forKey: "selectedFolderBookmark")
         selectedFolderURL = nil
         folderBookmark = nil
+    }
+
+    /// Stops accessing the security-scoped resource
+    func stopAccessingFolder() {
+        if isAccessingSecurityScopedResource, let url = selectedFolderURL {
+            url.stopAccessingSecurityScopedResource()
+            isAccessingSecurityScopedResource = false
+        }
     }
 
     /// Checks if iCloud Drive is available

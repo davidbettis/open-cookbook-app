@@ -68,7 +68,7 @@ extension Theme {
         // MARK: - Paragraphs
         .paragraph { configuration in
             configuration.label
-                .markdownMargin(top: .em(0.4), bottom: .em(0.4))
+                .markdownMargin(top: .em(0.8), bottom: .em(0.8))
         }
         // MARK: - Lists
         .listItem { configuration in
