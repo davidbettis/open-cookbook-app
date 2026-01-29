@@ -21,6 +21,9 @@ struct RecipeDetailSplitContent: View {
     /// Proportion of width for ingredients panel
     private let ingredientsProportion: CGFloat = 0.33
 
+    @AppStorage("autoNumberInstructions") private var autoNumberInstructions = true
+    private let instructionsFormatter = InstructionsFormatter()
+
     var body: some View {
         GeometryReader { geometry in
             HStack(spacing: 0) {
@@ -101,7 +104,10 @@ struct RecipeDetailSplitContent: View {
                     .padding(.bottom, 12)
 
                 if let instructions = instructions, !instructions.isEmpty {
-                    Markdown(instructions)
+                    let displayInstructions = autoNumberInstructions
+                        ? instructionsFormatter.format(instructions)
+                        : instructions
+                    Markdown(displayInstructions)
                         .markdownTheme(.recipe)
                 } else {
                     Text("No instructions provided")

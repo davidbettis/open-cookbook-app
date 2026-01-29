@@ -7,6 +7,7 @@
 
 import Foundation
 import RecipeMD
+import SwiftUI
 
 /// Central store for managing the recipe collection
 @MainActor
@@ -146,9 +147,11 @@ class RecipeStore {
             fileModifiedDate: Date()
         )
 
-        // Add to recipes array and cache
-        recipes.append(savedRecipeFile)
-        recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        // Add to recipes array and cache with animation for smooth UI update
+        withAnimation {
+            recipes.append(savedRecipeFile)
+            recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        }
         recipeCache[fileURL] = CachedRecipeFile(recipeFile: savedRecipeFile, modificationDate: Date())
 
         return savedRecipeFile
@@ -198,10 +201,13 @@ class RecipeStore {
             fileModifiedDate: Date()
         )
 
-        if let index = recipes.firstIndex(where: { $0.id == recipeFile.id }) {
-            recipes[index] = updatedRecipeFile
+        // Update recipes array with animation for smooth UI update
+        withAnimation {
+            if let index = recipes.firstIndex(where: { $0.id == recipeFile.id }) {
+                recipes[index] = updatedRecipeFile
+            }
+            recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
         }
-        recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
 
         // Update cache
         recipeCache[fileURL] = CachedRecipeFile(recipeFile: updatedRecipeFile, modificationDate: Date())
@@ -248,8 +254,10 @@ class RecipeStore {
             }
         }
 
-        // Remove from recipes array
-        recipes.removeAll { $0.id == recipeFile.id }
+        // Remove from recipes array with animation for smooth UI update
+        withAnimation {
+            recipes.removeAll { $0.id == recipeFile.id }
+        }
 
         // Remove from cache
         recipeCache.removeValue(forKey: fileURL)
@@ -282,9 +290,11 @@ class RecipeStore {
         // Sort recipes by title
         newRecipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
 
-        // Update state
-        recipes = newRecipes
-        parseErrors = newErrors
+        // Update state with animation for smooth UI update
+        withAnimation {
+            recipes = newRecipes
+            parseErrors = newErrors
+        }
     }
 
     /// Parse a single recipe file with caching

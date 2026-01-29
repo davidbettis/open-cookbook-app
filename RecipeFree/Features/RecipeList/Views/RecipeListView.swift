@@ -119,8 +119,9 @@ struct RecipeListView: View {
                 RecipeFormView(
                     viewModel: RecipeFormViewModel(mode: .add),
                     recipeStore: viewModel.recipeStore,
-                    onSave: { _ in
-                        // Recipe already added to store, just sync search
+                    onSave: { savedRecipe in
+                        // Recipe already added to store, sync search service immediately
+                        // This ensures the new recipe is searchable and visible right away
                         viewModel.syncSearchService()
                     }
                 )
@@ -264,6 +265,7 @@ struct RecipeListView: View {
             }
         }
         .listStyle(.plain)
+        .scrollDismissesKeyboard(.interactively)
         .refreshable {
             await viewModel.refresh()
         }

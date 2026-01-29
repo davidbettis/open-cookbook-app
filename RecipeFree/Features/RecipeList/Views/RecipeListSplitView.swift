@@ -76,7 +76,9 @@ struct RecipeListSplitView: View {
             RecipeFormView(
                 viewModel: RecipeFormViewModel(mode: .add),
                 recipeStore: viewModel.recipeStore,
-                onSave: { _ in
+                onSave: { savedRecipe in
+                    // Recipe already added to store, sync search service immediately
+                    // This ensures the new recipe is searchable and visible right away
                     viewModel.syncSearchService()
                 }
             )
@@ -188,6 +190,7 @@ struct RecipeListSplitView: View {
             }
         }
         .listStyle(.plain)
+        .scrollDismissesKeyboard(.interactively)
         .refreshable {
             await viewModel.refresh()
         }

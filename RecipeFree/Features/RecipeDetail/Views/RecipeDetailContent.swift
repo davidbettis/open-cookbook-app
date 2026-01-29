@@ -17,7 +17,10 @@ struct RecipeDetailContent: View {
     let markdownContent: String
 
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @AppStorage("autoNumberInstructions") private var autoNumberInstructions = true
     @State private var selectedPortion: PortionOption = .whole
+
+    private let instructionsFormatter = InstructionsFormatter()
 
     var body: some View {
         Group {
@@ -97,9 +100,12 @@ struct RecipeDetailContent: View {
 
             Divider()
 
-            // Instructions (still markdown)
+            // Instructions with optional auto-numbering
             if let instructions = recipeFile.instructions, !instructions.isEmpty {
-                Markdown(instructions)
+                let displayInstructions = autoNumberInstructions
+                    ? instructionsFormatter.format(instructions)
+                    : instructions
+                Markdown(displayInstructions)
                     .markdownTheme(.recipe)
                     .padding(.horizontal)
             }

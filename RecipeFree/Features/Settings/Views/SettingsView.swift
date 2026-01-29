@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Environment(FolderManager.self) private var folderManager
+    @AppStorage("autoNumberInstructions") private var autoNumberInstructions = true
     @State private var showFolderPicker = false
     @State private var showChangeConfirmation = false
     @State private var selectedURL: URL?
@@ -44,6 +45,14 @@ struct SettingsView: View {
                     .foregroundStyle(.blue)
                 } header: {
                     Text("Storage")
+                }
+
+                Section {
+                    Toggle("Auto-number Instructions", isOn: $autoNumberInstructions)
+                } header: {
+                    Text("Display")
+                } footer: {
+                    Text("Automatically add step numbers to recipe instructions that don't already have numbering.")
                 }
 
                 #if DEBUG
