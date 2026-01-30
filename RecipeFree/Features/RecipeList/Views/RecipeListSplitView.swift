@@ -20,6 +20,7 @@ struct RecipeListSplitView: View {
     @State private var showErrorAlert = false
     @State private var showAddRecipe = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @AppStorage("isLibraryExpanded") private var isLibraryExpanded = false
 
     // MARK: - Initialization
 
@@ -35,8 +36,23 @@ struct RecipeListSplitView: View {
             sidebarContent
                 .navigationTitle("Recipes")
                 .navigationBarTitleDisplayMode(.inline)
-                .navigationSplitViewColumnWidth(min: 300, ideal: 350, max: 500)
+                .navigationSplitViewColumnWidth(
+                    min: isLibraryExpanded ? 1000 : 300,
+                    ideal: isLibraryExpanded ? 2000 : 350,
+                    max: isLibraryExpanded ? .infinity : 500
+                )
                 .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            toggleLibraryExpansion()
+                        } label: {
+                            Image(systemName: isLibraryExpanded
+                                ? "arrow.down.right.and.arrow.up.left"
+                                : "arrow.up.left.and.arrow.down.right")
+                        }
+                        .accessibilityLabel(isLibraryExpanded ? "Collapse Library" : "Expand Library")
+                    }
+
                     ToolbarItem(placement: .primaryAction) {
                         Button {
                             showAddRecipe = true
@@ -68,7 +84,9 @@ struct RecipeListSplitView: View {
         }
         .onChange(of: selectedRecipeFile) { _, newValue in
             if newValue != nil {
-                columnVisibility = .detailOnly
+                withAnimation {
+                    columnVisibility = .detailOnly
+                }
             }
         }
         .navigationSplitViewStyle(.prominentDetail)
@@ -82,6 +100,17 @@ struct RecipeListSplitView: View {
                     viewModel.syncSearchService()
                 }
             )
+        }
+    }
+
+    // MARK: - Actions
+
+    private func toggleLibraryExpansion() {
+        withAnimation {
+            isLibraryExpanded.toggle()
+            if isLibraryExpanded {
+                columnVisibility = .all
+            }
         }
     }
 
@@ -219,7 +248,7 @@ struct RecipeListSplitView: View {
             ContentUnavailableView(
                 "Select a Recipe",
                 systemImage: "book",
-                description: Text("Choose a recipe from the list to view its details")
+                description: Text("Tap on the \(Image(systemName: "sidebar.left")) icon to view a recipe from your library")
             )
         }
     }

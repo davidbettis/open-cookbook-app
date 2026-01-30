@@ -19,6 +19,10 @@ struct SettingsView: View {
     @State private var samplesLoadedCount = 0
     @State private var showSamplesSuccess = false
 
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -78,10 +82,26 @@ struct SettingsView: View {
                 #endif
 
                 Section {
+                    Link(destination: URL(string: "mailto:david%2Brecipefree@davidbettis.com?subject=RecipeFree%20Feedback")!) {
+                        HStack {
+                            Label("Send Feedback", systemImage: "envelope")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Feedback")
+                } footer: {
+                    Text("Recipe Free is still a work in progress. We'd love to hear your suggestions and feedback.")
+                }
+
+                Section {
                     HStack {
                         Text("App Version")
                         Spacer()
-                        Text("1.0.0")
+                        Text(appVersion)
                             .foregroundStyle(.secondary)
                     }
                 } header: {
