@@ -20,6 +20,7 @@ struct RecipeFormView: View {
     @State private var showCancelConfirmation = false
     @State private var showErrorAlert = false
     @State private var showConflictAlert = false
+    @FocusState private var focusedIngredientField: IngredientField?
 
     // MARK: - Initialization
 
@@ -91,18 +92,25 @@ struct RecipeFormView: View {
                 // Ingredients Section
                 Section {
                     ForEach($viewModel.ingredients) { $ingredient in
+                        let isLast = ingredient.id == viewModel.ingredients.last?.id
                         IngredientRowView(
                             ingredient: $ingredient,
+                            isLastRow: isLast,
+                            focusedField: $focusedIngredientField,
                             onDelete: {
                                 if let index = viewModel.ingredients.firstIndex(where: { $0.id == ingredient.id }) {
                                     viewModel.removeIngredient(at: IndexSet(integer: index))
                                 }
+                            },
+                            onTabFromName: {
+                                handleIngredientTabNavigation(from: ingredient.id)
                             }
                         )
                     }
 
                     Button {
-                        viewModel.addIngredient()
+                        let newId = viewModel.addIngredient()
+                        focusedIngredientField = .amount(newId)
                     } label: {
                         Label("Add Ingredient", systemImage: "plus.circle")
                     }
@@ -209,6 +217,24 @@ struct RecipeFormView: View {
             showCancelConfirmation = true
         } else {
             dismiss()
+        }
+    }
+
+    private func handleIngredientTabNavigation(from ingredientId: UUID) {
+        guard let currentIndex = viewModel.ingredients.firstIndex(where: { $0.id == ingredientId }) else {
+            return
+        }
+
+        let isLastRow = currentIndex == viewModel.ingredients.count - 1
+
+        if isLastRow {
+            // Add a new row and focus its amount field
+            let newId = viewModel.addIngredient()
+            focusedIngredientField = .amount(newId)
+        } else {
+            // Move to the next row's amount field
+            let nextIngredient = viewModel.ingredients[currentIndex + 1]
+            focusedIngredientField = .amount(nextIngredient.id)
         }
     }
 

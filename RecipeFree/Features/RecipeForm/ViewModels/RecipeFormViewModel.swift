@@ -210,9 +210,12 @@ class RecipeFormViewModel {
 
     // MARK: - Public Methods
 
-    /// Add a new empty ingredient row
-    func addIngredient() {
-        ingredients.append(EditableIngredient())
+    /// Add a new empty ingredient row and return its ID
+    @discardableResult
+    func addIngredient() -> UUID {
+        let newIngredient = EditableIngredient()
+        ingredients.append(newIngredient)
+        return newIngredient.id
     }
 
     /// Remove ingredient at index
