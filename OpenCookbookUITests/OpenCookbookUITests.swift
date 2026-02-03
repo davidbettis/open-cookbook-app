@@ -25,7 +25,7 @@ final class OpenCookbookUITests: XCTestCase {
         app.launch()
 
         // Verify "Hello, world!" appears
-        XCTAssertTrue(app.staticTexts["Welcome to OpenCookbook"].exists)
+        XCTAssertTrue(app.staticTexts["Welcome to Open Cookbook"].exists)
     }
 
     @MainActor

@@ -116,15 +116,6 @@ final class FolderManager {
 
     // MARK: - Public Methods
 
-    /// Presents folder picker and returns selected folder URL
-    /// - Returns: The selected folder URL
-    /// - Throws: Error if folder selection fails or is cancelled
-    func selectFolder() async throws -> URL {
-        // TODO: Implement folder picker presentation
-        // Will be implemented in Task 2.2
-        fatalError("selectFolder() not yet implemented")
-    }
-
     /// Saves the selected folder URL with security-scoped bookmark
     /// - Parameter url: The folder URL to save
     /// - Throws: Error if bookmark creation or save fails
