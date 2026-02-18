@@ -22,7 +22,12 @@ struct RecipeDetailSplitContent: View {
     private let ingredientsProportion: CGFloat = 0.33
 
     @AppStorage("autoNumberInstructions") private var autoNumberInstructions = true
+    @AppStorage("amountDisplayFormat") private var amountDisplayFormatRaw: String = AmountDisplayFormat.original.rawValue
     private let instructionsFormatter = InstructionsFormatter()
+
+    private var amountFormat: AmountDisplayFormat {
+        AmountDisplayFormat(rawValue: amountDisplayFormatRaw) ?? .original
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -55,7 +60,7 @@ struct RecipeDetailSplitContent: View {
             // Yield and portion selector on same line
             HStack {
                 // Scaled yield (left-aligned)
-                let scaledYield = yield.formattedScaled(by: selectedPortion.multiplier)
+                let scaledYield = yield.formattedScaled(by: selectedPortion.multiplier, format: amountFormat)
                 if !scaledYield.isEmpty {
                     Text(scaledYield)
                         .font(.subheadline)

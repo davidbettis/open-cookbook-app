@@ -25,4 +25,17 @@ extension Yield {
 
         return scaledAmounts.joined(separator: ", ")
     }
+
+    /// Returns a formatted string with all yield amounts scaled, using the specified display format
+    func formattedScaled(by multiplier: Double, format: AmountDisplayFormat) -> String {
+        if multiplier == 1.0 && format == .original {
+            return self.formatted
+        }
+
+        let scaledAmounts = self.amount.map { amount -> String in
+            amount.formattedScaled(by: multiplier, format: format)
+        }
+
+        return scaledAmounts.joined(separator: ", ")
+    }
 }

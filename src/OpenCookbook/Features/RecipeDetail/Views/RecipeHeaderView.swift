@@ -16,6 +16,12 @@ struct RecipeHeaderView: View {
     let yield: Yield
     var portionMultiplier: Double = 1.0
 
+    @AppStorage("amountDisplayFormat") private var amountDisplayFormatRaw: String = AmountDisplayFormat.original.rawValue
+
+    private var amountFormat: AmountDisplayFormat {
+        AmountDisplayFormat(rawValue: amountDisplayFormatRaw) ?? .original
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Title
@@ -38,7 +44,7 @@ struct RecipeHeaderView: View {
             }
 
             // Yields (scaled by portion multiplier)
-            let scaledYield = yield.formattedScaled(by: portionMultiplier)
+            let scaledYield = yield.formattedScaled(by: portionMultiplier, format: amountFormat)
             if !scaledYield.isEmpty {
                 YieldView(yieldText: scaledYield)
             }

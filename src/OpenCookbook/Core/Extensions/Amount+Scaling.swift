@@ -22,6 +22,34 @@ extension Amount {
         return formattedNumber
     }
 
+    /// Returns a formatted string with the amount scaled by the given multiplier, using the specified display format
+    /// - Parameters:
+    ///   - multiplier: The scaling factor (e.g., 0.5 for half, 2.0 for double)
+    ///   - format: The display format to use (original, decimal, or fraction)
+    /// - Returns: Formatted string with scaled amount and unit
+    func formattedScaled(by multiplier: Double, format: AmountDisplayFormat) -> String {
+        let scaledValue = self.amount * multiplier
+
+        let formattedNumber: String
+        switch format {
+        case .original:
+            if multiplier == 1.0 {
+                formattedNumber = self.rawText
+            } else {
+                formattedNumber = Self.formatFractionUnicode(scaledValue)
+            }
+        case .decimal:
+            formattedNumber = Self.formatDecimal(scaledValue)
+        case .fraction:
+            formattedNumber = Self.formatFractionUnicode(scaledValue)
+        }
+
+        if let unit = self.unit, !unit.isEmpty {
+            return "\(formattedNumber) \(unit)"
+        }
+        return formattedNumber
+    }
+
     /// Formats a number cleanly, removing unnecessary decimals
     /// - Parameter value: The number to format
     /// - Returns: Formatted string
@@ -55,5 +83,53 @@ extension Amount {
             return trimmed
         }
         return formatted
+    }
+
+    // MARK: - Decimal Formatting
+
+    /// Formats a number as a clean decimal string
+    static func formatDecimal(_ value: Double) -> String {
+        formatNumber(value)
+    }
+
+    // MARK: - Unicode Fraction Formatting
+
+    /// Lookup table mapping fractional remainders to Unicode fraction characters
+    private static let unicodeFractions: [(Double, Character)] = [
+        (1.0/8.0, "⅛"),
+        (1.0/4.0, "¼"),
+        (1.0/3.0, "⅓"),
+        (3.0/8.0, "⅜"),
+        (1.0/2.0, "½"),
+        (5.0/8.0, "⅝"),
+        (2.0/3.0, "⅔"),
+        (3.0/4.0, "¾"),
+        (7.0/8.0, "⅞"),
+    ]
+
+    /// Converts a Double to a Unicode fraction string (e.g., 1.5 → "1½", 0.25 → "¼")
+    static func formatFractionUnicode(_ value: Double) -> String {
+        guard !value.isZero else { return "0" }
+
+        let whole = Int(value)
+        let remainder = value - Double(whole)
+
+        // Whole number — no fraction needed
+        if abs(remainder) < 0.01 {
+            return "\(whole)"
+        }
+
+        // Match remainder to a Unicode fraction
+        for (fractionValue, character) in unicodeFractions {
+            if abs(remainder - fractionValue) < 0.01 {
+                if whole > 0 {
+                    return "\(whole)\(character)"
+                }
+                return String(character)
+            }
+        }
+
+        // No match — fall back to decimal
+        return formatDecimal(value)
     }
 }

@@ -10,6 +10,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(FolderManager.self) private var folderManager
     @AppStorage("autoNumberInstructions") private var autoNumberInstructions = true
+    @AppStorage("amountDisplayFormat") private var amountDisplayFormat: String = AmountDisplayFormat.original.rawValue
     @State private var showFolderPicker = false
     @State private var showChangeConfirmation = false
     @State private var selectedURL: URL?
@@ -53,10 +54,16 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Auto-number Instructions", isOn: $autoNumberInstructions)
+
+                    Picker("Amount Format", selection: $amountDisplayFormat) {
+                        Text("Original").tag(AmountDisplayFormat.original.rawValue)
+                        Text("Decimal").tag(AmountDisplayFormat.decimal.rawValue)
+                        Text("Fraction").tag(AmountDisplayFormat.fraction.rawValue)
+                    }
                 } header: {
                     Text("Display")
                 } footer: {
-                    Text("Automatically add step numbers to recipe instructions that don't already have numbering.")
+                    Text("Choose how ingredient amounts are displayed. Original shows amounts as written in the recipe file.")
                 }
 
                 #if DEBUG
