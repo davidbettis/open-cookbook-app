@@ -27,11 +27,15 @@ Classic Neapolitan pizza with San Marzano tomatoes, fresh mozzarella, and basil.
 
 ---
 
-For the dough, dissolve yeast in warm water with sugar. Let stand for 5 minutes until foamy.
+## Make the Dough
+
+Dissolve yeast in warm water with sugar. Let stand for 5 minutes until foamy.
 
 In a large bowl, combine flour and salt. Make a well in center and add yeast mixture and olive oil. Mix until dough comes together.
 
 Knead on a floured surface for 8-10 minutes until smooth and elastic. Place in an oiled bowl, cover, and let rise for 1-2 hours until doubled in size.
+
+## Assemble and Bake
 
 Preheat oven to 475°F (245°C). If using a pizza stone, place it in the oven to preheat.
 

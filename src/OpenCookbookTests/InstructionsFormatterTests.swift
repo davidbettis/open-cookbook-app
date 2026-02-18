@@ -99,7 +99,7 @@ struct InstructionsFormatterTests {
 
     // MARK: - Stop Triggers
 
-    @Test func stopsAtHeader() {
+    @Test func resetsNumberingAtHeader() {
         let input = """
         Preheat oven
         Mix ingredients
@@ -113,9 +113,10 @@ struct InstructionsFormatterTests {
         #expect(result.contains("1. Preheat oven"))
         #expect(result.contains("2. Mix ingredients"))
         #expect(result.contains("## Tips"))
-        #expect(result.contains("Let dough rest before baking"))
         #expect(!result.contains("3. ## Tips"))
-        #expect(!result.contains("3. Let dough"))
+        // After heading, numbering resets to 1
+        #expect(result.contains("1. Let dough rest before baking"))
+        #expect(result.contains("2. Use room temperature butter"))
     }
 
     @Test func stopsAtHorizontalRule() {
@@ -216,6 +217,30 @@ struct InstructionsFormatterTests {
         let input = "   Preheat oven   "
         let result = formatter.format(input)
         #expect(result == "1. Preheat oven")
+    }
+
+    @Test func resetsNumberingAfterHeading() {
+        let input = """
+        Preheat oven
+        Mix dough
+        ## Filling
+        Mix sugar and cinnamon
+        Spread on dough
+        ## Baking
+        Bake at 375F
+        Let cool
+        """
+
+        let result = formatter.format(input)
+
+        #expect(result.contains("1. Preheat oven"))
+        #expect(result.contains("2. Mix dough"))
+        #expect(result.contains("## Filling"))
+        #expect(result.contains("1. Mix sugar and cinnamon"))
+        #expect(result.contains("2. Spread on dough"))
+        #expect(result.contains("## Baking"))
+        #expect(result.contains("1. Bake at 375F"))
+        #expect(result.contains("2. Let cool"))
     }
 
     @Test func handlesVariousHorizontalRules() {

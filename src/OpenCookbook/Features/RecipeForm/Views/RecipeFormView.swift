@@ -21,6 +21,7 @@ struct RecipeFormView: View {
     @State private var showErrorAlert = false
     @State private var showConflictAlert = false
     @State private var groupToDelete: EditableIngredientGroup?
+    @State private var instructionGroupToDeleteId: UUID?
     @FocusState private var focusedIngredientField: IngredientField?
 
     // MARK: - Initialization
@@ -38,197 +39,15 @@ struct RecipeFormView: View {
     // MARK: - Body
 
     var body: some View {
-        @Bindable var viewModel = viewModel
         NavigationStack {
             Form {
-                // Title Section
-                Section {
-                    VStack(alignment: .leading, spacing: 4) {
-                        TextField("Recipe name", text: $viewModel.title)
-                            .font(.headline)
-                            .accessibilityLabel("Recipe title")
-                        if viewModel.titleHasError {
-                            Text(viewModel.validationErrors.first { $0.field == "title" }?.message ?? "")
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                    }
-                } header: {
-                    HStack {
-                        Text("Title")
-                        Text("*").foregroundStyle(.red)
-                    }
-                }
-
-                // Description Section
-                Section("Description") {
-                    TextEditor(text: $viewModel.descriptionText)
-                        .frame(minHeight: 80)
-                        .accessibilityLabel("Recipe description")
-                        .accessibilityHint("Optional brief description of the recipe")
-                }
-
-                // Tags Section
-                Section {
-                    TextField("dessert, quick, vegetarian", text: $viewModel.tagsText)
-                        .accessibilityLabel("Recipe tags")
-                        .accessibilityHint("Enter tags separated by commas")
-                } header: {
-                    Text("Tags")
-                } footer: {
-                    Text("Separate tags with commas")
-                }
-
-                // Yields Section
-                Section {
-                    TextField("serves 4, makes 12 cookies", text: $viewModel.yieldsText)
-                        .accessibilityLabel("Recipe yields")
-                        .accessibilityHint("Enter serving size or quantity")
-                } header: {
-                    Text("Yields")
-                } footer: {
-                    Text("Separate multiple yields with commas")
-                }
-
-                // Ingredients Section (ungrouped) — hidden when recipe has only named groups
-                if !viewModel.ingredients.isEmpty || viewModel.ingredientGroups.isEmpty {
-                    Section {
-                        ForEach($viewModel.ingredients) { $ingredient in
-                            let isLast = ingredient.id == viewModel.ingredients.last?.id
-                            IngredientRowView(
-                                ingredient: $ingredient,
-                                isLastRow: isLast,
-                                focusedField: $focusedIngredientField,
-                                onDelete: {
-                                    if let index = viewModel.ingredients.firstIndex(where: { $0.id == ingredient.id }) {
-                                        viewModel.removeIngredient(at: IndexSet(integer: index))
-                                    }
-                                },
-                                onTabFromName: {
-                                    handleIngredientTabNavigation(from: ingredient.id)
-                                }
-                            )
-                        }
-
-                        Button {
-                            let newId = viewModel.addIngredient()
-                            focusedIngredientField = .amount(newId)
-                        } label: {
-                            Label("Add Ingredient", systemImage: "plus.circle")
-                        }
-                        .accessibilityHint("Add another ingredient to the list")
-
-                        if viewModel.ingredientsHasError {
-                            Text(viewModel.validationErrors.first { $0.field == "ingredients" }?.message ?? "")
-                                .font(.caption)
-                                .foregroundStyle(.red)
-                        }
-                    } header: {
-                        HStack {
-                            Text("Ingredients")
-                            Text("*").foregroundStyle(.red)
-                        }
-                    }
-                }
-
-                // Named Ingredient Groups
-                ForEach($viewModel.ingredientGroups) { $group in
-                    Section {
-                        ForEach($group.ingredients) { $ingredient in
-                            let isLast = ingredient.id == group.ingredients.last?.id
-                            IngredientRowView(
-                                ingredient: $ingredient,
-                                isLastRow: isLast,
-                                focusedField: $focusedIngredientField,
-                                onDelete: {
-                                    if let idx = group.ingredients.firstIndex(where: { $0.id == ingredient.id }) {
-                                        viewModel.removeIngredientFromGroup(
-                                            groupId: group.id,
-                                            at: IndexSet(integer: idx)
-                                        )
-                                    }
-                                },
-                                onTabFromName: {
-                                    handleGroupIngredientTabNavigation(
-                                        from: ingredient.id,
-                                        in: group.id
-                                    )
-                                }
-                            )
-                        }
-
-                        Button {
-                            if let newId = viewModel.addIngredientToGroup(groupId: group.id) {
-                                focusedIngredientField = .amount(newId)
-                            }
-                        } label: {
-                            Label("Add Ingredient", systemImage: "plus.circle")
-                        }
-                        .accessibilityHint("Add another ingredient to this group")
-                    } header: {
-                        HStack {
-                            TextField("Group name", text: $group.title)
-                                .font(.headline)
-                                .textInputAutocapitalization(.sentences)
-                                .accessibilityLabel("Ingredient group title")
-                            Spacer()
-                            Button {
-                                groupToDelete = group
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Delete group \(group.title)")
-                        }
-                    }
-                }
-
-                // Validation error for group titles
-                if viewModel.groupTitleHasError {
-                    Section {
-                        Text(viewModel.validationErrors.first { $0.field == "groupTitle" }?.message ?? "")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                }
-
-                // Add Ingredient Group button
-                Section {
-                    Button {
-                        viewModel.addIngredientGroup()
-                    } label: {
-                        Label("Add Ingredient Group", systemImage: "plus.circle.fill")
-                    }
-                    .accessibilityHint("Add a new named ingredient group")
-                }
-
-                // Instructions Section
-                Section("Instructions") {
-                    TextEditor(text: $viewModel.instructions)
-                        .frame(minHeight: 300)
-                        .accessibilityLabel("Recipe instructions")
-                        .accessibilityHint("Enter step-by-step cooking instructions")
-                }
+                metadataSections
+                ingredientsSections
+                instructionsSections
             }
             .navigationTitle(viewModel.navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        handleCancel()
-                    }
-                }
-
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(viewModel.saveButtonText) {
-                        Task {
-                            await handleSave(forceOverwrite: false)
-                        }
-                    }
-                    .disabled(viewModel.isSaving)
-                }
-            }
+            .toolbar { formToolbar }
             .overlay {
                 if viewModel.isSaving {
                     savingOverlay
@@ -239,9 +58,7 @@ struct RecipeFormView: View {
                 isPresented: $showCancelConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("Discard Changes", role: .destructive) {
-                    dismiss()
-                }
+                Button("Discard Changes", role: .destructive) { dismiss() }
                 Button("Keep Editing", role: .cancel) {}
             } message: {
                 Text("You have unsaved changes that will be lost.")
@@ -267,22 +84,272 @@ struct RecipeFormView: View {
                         groupToDelete = nil
                     }
                 }
-                Button("Cancel", role: .cancel) {
-                    groupToDelete = nil
-                }
+                Button("Cancel", role: .cancel) { groupToDelete = nil }
             } message: {
                 Text("This will delete the group and all its ingredients.")
             }
+            .confirmationDialog(
+                "Delete Instruction Group?",
+                isPresented: Binding(
+                    get: { instructionGroupToDeleteId != nil },
+                    set: { if !$0 { instructionGroupToDeleteId = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button("Delete Group", role: .destructive) {
+                    if let id = instructionGroupToDeleteId {
+                        viewModel.removeInstructionGroup(id: id)
+                        instructionGroupToDeleteId = nil
+                    }
+                }
+                Button("Cancel", role: .cancel) { instructionGroupToDeleteId = nil }
+            } message: {
+                Text("This will delete the instruction group and its contents.")
+            }
             .alert("Recipe Modified Externally", isPresented: $showConflictAlert) {
                 Button("Overwrite", role: .destructive) {
-                    Task {
-                        await handleSave(forceOverwrite: true)
-                    }
+                    Task { await handleSave(forceOverwrite: true) }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("This recipe was changed outside the app (possibly on another device). Do you want to overwrite those changes with your version?")
             }
+        }
+    }
+
+    // MARK: - Form Sections
+
+    @ToolbarContentBuilder
+    private var formToolbar: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button("Cancel") { handleCancel() }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+            Button(viewModel.saveButtonText) {
+                Task { await handleSave(forceOverwrite: false) }
+            }
+            .disabled(viewModel.isSaving)
+        }
+    }
+
+    @ViewBuilder
+    private var metadataSections: some View {
+        @Bindable var viewModel = viewModel
+
+        Section {
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Recipe name", text: $viewModel.title)
+                    .font(.headline)
+                    .accessibilityLabel("Recipe title")
+                if viewModel.titleHasError {
+                    Text(viewModel.validationErrors.first { $0.field == "title" }?.message ?? "")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+        } header: {
+            HStack {
+                Text("Title")
+                Text("*").foregroundStyle(.red)
+            }
+        }
+
+        Section("Description") {
+            TextEditor(text: $viewModel.descriptionText)
+                .frame(minHeight: 80)
+                .accessibilityLabel("Recipe description")
+                .accessibilityHint("Optional brief description of the recipe")
+        }
+
+        Section {
+            TextField("dessert, quick, vegetarian", text: $viewModel.tagsText)
+                .accessibilityLabel("Recipe tags")
+                .accessibilityHint("Enter tags separated by commas")
+        } header: {
+            Text("Tags")
+        } footer: {
+            Text("Separate tags with commas")
+        }
+
+        Section {
+            TextField("serves 4, makes 12 cookies", text: $viewModel.yieldsText)
+                .accessibilityLabel("Recipe yields")
+                .accessibilityHint("Enter serving size or quantity")
+        } header: {
+            Text("Yields")
+        } footer: {
+            Text("Separate multiple yields with commas")
+        }
+    }
+
+    @ViewBuilder
+    private var ingredientsSections: some View {
+        @Bindable var viewModel = viewModel
+
+        // Ungrouped ingredients — hidden when recipe has only named groups
+        if !viewModel.ingredients.isEmpty || viewModel.ingredientGroups.isEmpty {
+            Section {
+                ForEach($viewModel.ingredients) { $ingredient in
+                    let isLast = ingredient.id == viewModel.ingredients.last?.id
+                    IngredientRowView(
+                        ingredient: $ingredient,
+                        isLastRow: isLast,
+                        focusedField: $focusedIngredientField,
+                        onDelete: {
+                            if let index = viewModel.ingredients.firstIndex(where: { $0.id == ingredient.id }) {
+                                viewModel.removeIngredient(at: IndexSet(integer: index))
+                            }
+                        },
+                        onTabFromName: {
+                            handleIngredientTabNavigation(from: ingredient.id)
+                        }
+                    )
+                }
+
+                Button {
+                    let newId = viewModel.addIngredient()
+                    focusedIngredientField = .amount(newId)
+                } label: {
+                    Label("Add Ingredient", systemImage: "plus.circle")
+                }
+                .accessibilityHint("Add another ingredient to the list")
+
+                if viewModel.ingredientsHasError {
+                    Text(viewModel.validationErrors.first { $0.field == "ingredients" }?.message ?? "")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            } header: {
+                HStack {
+                    Text("Ingredients")
+                    Text("*").foregroundStyle(.red)
+                }
+            }
+        }
+
+        // Named Ingredient Groups
+        ForEach($viewModel.ingredientGroups) { $group in
+            Section {
+                ForEach($group.ingredients) { $ingredient in
+                    let isLast = ingredient.id == group.ingredients.last?.id
+                    IngredientRowView(
+                        ingredient: $ingredient,
+                        isLastRow: isLast,
+                        focusedField: $focusedIngredientField,
+                        onDelete: {
+                            if let idx = group.ingredients.firstIndex(where: { $0.id == ingredient.id }) {
+                                viewModel.removeIngredientFromGroup(
+                                    groupId: group.id,
+                                    at: IndexSet(integer: idx)
+                                )
+                            }
+                        },
+                        onTabFromName: {
+                            handleGroupIngredientTabNavigation(from: ingredient.id, in: group.id)
+                        }
+                    )
+                }
+
+                Button {
+                    if let newId = viewModel.addIngredientToGroup(groupId: group.id) {
+                        focusedIngredientField = .amount(newId)
+                    }
+                } label: {
+                    Label("Add Ingredient", systemImage: "plus.circle")
+                }
+                .accessibilityHint("Add another ingredient to this group")
+            } header: {
+                HStack {
+                    TextField("Group name", text: $group.title)
+                        .font(.headline)
+                        .textInputAutocapitalization(.sentences)
+                        .accessibilityLabel("Ingredient group title")
+                    Spacer()
+                    Button {
+                        groupToDelete = group
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Delete group \(group.title)")
+                }
+            }
+        }
+
+        if viewModel.groupTitleHasError {
+            Section {
+                Text(viewModel.validationErrors.first { $0.field == "groupTitle" }?.message ?? "")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+
+        Section {
+            Button {
+                viewModel.addIngredientGroup()
+            } label: {
+                Label("Add Ingredient Group", systemImage: "plus.circle.fill")
+            }
+            .accessibilityHint("Add a new named ingredient group")
+        }
+    }
+
+    @ViewBuilder
+    private var instructionsSections: some View {
+        @Bindable var viewModel = viewModel
+
+        // Ungrouped instructions (always first)
+        Section("Instructions") {
+            TextEditor(text: $viewModel.instructionGroups[0].text)
+                .frame(minHeight: 200)
+                .accessibilityLabel("Recipe instructions")
+                .accessibilityHint("Enter step-by-step cooking instructions")
+        }
+
+        // Named Instruction Groups
+        let ungroupedId = viewModel.instructionGroups[0].id
+        ForEach($viewModel.instructionGroups) { $group in
+            if group.id != ungroupedId {
+                Section {
+                    TextEditor(text: $group.text)
+                        .frame(minHeight: 150)
+                        .accessibilityLabel("Instructions for \(group.title)")
+                } header: {
+                    HStack {
+                        TextField("Group name", text: $group.title)
+                            .font(.headline)
+                            .textInputAutocapitalization(.sentences)
+                            .accessibilityLabel("Instruction group title")
+                        Spacer()
+                        Button {
+                            instructionGroupToDeleteId = group.id
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Delete instruction group \(group.title)")
+                    }
+                }
+            }
+        }
+
+        if viewModel.instructionGroupTitleHasError {
+            Section {
+                Text(viewModel.validationErrors.first { $0.field == "instructionGroupTitle" }?.message ?? "")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+
+        Section {
+            Button {
+                viewModel.addInstructionGroup()
+            } label: {
+                Label("Add Instruction Group", systemImage: "plus.circle.fill")
+            }
+            .accessibilityHint("Add a new named instruction group")
         }
     }
 
@@ -323,11 +390,9 @@ struct RecipeFormView: View {
         let isLastRow = currentIndex == viewModel.ingredients.count - 1
 
         if isLastRow {
-            // Add a new row and focus its amount field
             let newId = viewModel.addIngredient()
             focusedIngredientField = .amount(newId)
         } else {
-            // Move to the next row's amount field
             let nextIngredient = viewModel.ingredients[currentIndex + 1]
             focusedIngredientField = .amount(nextIngredient.id)
         }
@@ -395,7 +460,7 @@ struct RecipeFormView: View {
                 Ingredient(name: "flour", amount: Amount(2, unit: "cups")),
                 Ingredient(name: "sugar", amount: Amount(1, unit: "cup"))
             ])],
-            instructions: "1. Mix ingredients\n2. Bake at 350F"
+            instructions: "Preheat oven to 350F\nMix ingredients\n\n## Frosting\n\nBeat cream cheese until smooth\nAdd powdered sugar"
         )
     )
 
@@ -434,7 +499,7 @@ struct RecipeFormView: View {
                     ]
                 )
             ],
-            instructions: "1. Make dough\n2. Roll out and fill\n3. Bake\n4. Frost"
+            instructions: "Make dough\nRoll out and fill\n\n## Baking\n\nBake at 375F for 25 minutes\nLet cool slightly\n\n## Frosting\n\nBeat cream cheese\nSpread over warm rolls"
         )
     )
 

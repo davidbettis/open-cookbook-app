@@ -27,7 +27,13 @@ Create new recipes using a form-based UI that maps to RecipeMD format structure.
 - [ ] User can rename ingredient group titles
 - [ ] Ingredients not in any group remain in a default ungrouped section
 - [ ] Ingredient groups serialize to RecipeMD H2 headings with their ingredient lists
-- [ ] Instructions entry (multi-line markdown text)
+- [ ] Instructions entry (multi-line markdown text) with optional instruction groups
+- [ ] User can add instruction groups with a title and instruction text
+- [ ] User can remove instruction groups
+- [ ] User can rename instruction group titles
+- [ ] Ungrouped instructions remain in a default section at the top
+- [ ] Instruction groups serialize to H2 headings within the freeform instructions string
+- [ ] When editing, existing headings in instructions are parsed into instruction groups in the form
 - [ ] Save button creates valid RecipeMD file in iCloud folder
 - [ ] File naming convention (e.g., title-slugified.md)
 - [ ] Validation for required fields (at minimum: title, ingredients)
@@ -164,9 +170,27 @@ Ingredient groups allow users to organize ingredients under titled sections (e.g
 │                             │
 │ Instructions                │
 │ ┌─────────────────────────┐ │
-│ │ 1. Preheat oven...      │ │
-│ │ 2. Mix ingredients...   │ │
+│ │ Preheat oven to 350°F.  │ │ ← Ungrouped instructions
+│ │                         │ │
 │ └─────────────────────────┘ │
+│                             │
+│ ┌─────────────────────── ✕ ┐│
+│ │ Make the Dough           ││ ← Group header (editable title + delete)
+│ └──────────────────────────┘│
+│ ┌─────────────────────────┐ │
+│ │ 1. Mix flour and salt   │ │ ← Group instructions (text editor)
+│ │ 2. Add butter and knead │ │
+│ └─────────────────────────┘ │
+│                             │
+│ ┌─────────────────────── ✕ ┐│
+│ │ Prepare the Filling      ││
+│ └──────────────────────────┘│
+│ ┌─────────────────────────┐ │
+│ │ 1. Combine cream cheese │ │
+│ │ 2. Beat until smooth    │ │
+│ └─────────────────────────┘ │
+│                             │
+│ + Add Instruction Group     │ ← Adds a new named group
 └─────────────────────────────┘
 ```
 
@@ -186,7 +210,64 @@ Ingredient groups allow users to organize ingredients under titled sections (e.g
   - Each group has its own ingredient list and "+ Add Ingredient" button
   - "+ Add Ingredient Group" button at the bottom of the entire ingredients section
   - Groups are visually separated from ungrouped ingredients
-- **Instructions**: Multi-line text editor, supports markdown
+- **Instructions**: Structured instruction groups UI (see below)
+
+### Instruction Groups
+**Tracking**: [GitHub Issue #4](https://github.com/davidbettis/open-cookbook-app/issues/4)
+
+Instruction groups allow users to organize instructions under titled sections (e.g., "Prepare the Dough", "Make the Filling"). Groups are optional — by default, instructions appear as a single freeform text block.
+
+**Not modeled in the Recipe**: Unlike ingredient groups, instruction groups are not a separate field in the data model. Instructions remain a single freeform markdown string. The form UI provides structured editing that reads from and writes to this string.
+
+**Parsing from Freeform Text**:
+- When loading instructions into the form, headings (H2, H3, etc.) in the markdown are detected and split into groups
+- Text before the first heading becomes the ungrouped/default section
+- Each heading starts a new group whose title is the heading text
+- A group's content is all text between its heading and the next heading (or end of string)
+
+**Data Model (Form Only)**:
+- The form maintains an ordered list of instruction sections
+- Each section is either ungrouped (no title) or a named group (has a title)
+- The first section is always the ungrouped/default section (may be empty)
+- Named groups appear after the ungrouped section
+- Groups are one level deep only — headings are not nested
+
+**Adding a Group**:
+- "+ Add Instruction Group" button appears below the instructions section
+- Tapping it appends a new group with an empty title and an empty text area
+- User enters a group title (e.g., "Prepare the Filling")
+- Group title is required and validated to be non-empty
+
+**Removing a Group**:
+- Each group header has a delete button
+- Deleting a group removes the group title and its instructions text
+- Confirmation dialog: "Delete group and its instructions?"
+- The ungrouped section cannot be deleted
+
+**Editing a Group**:
+- Group title is an editable text field in the group header
+- Instructions within a group use the same multi-line text editor as ungrouped instructions
+- Each group has its own text area
+
+**Serialization**:
+- Ungrouped instructions serialize as plain text at the start of the instructions block
+- Each named group serializes as an H2 heading followed by its instruction text
+- Example output:
+  ```markdown
+  ---
+
+  Preheat the oven to 350°F.
+
+  ## Make the Dough
+
+  1. Mix flour and salt in a bowl
+  2. Add butter and knead until smooth
+
+  ## Prepare the Filling
+
+  1. Combine cream cheese and sugar
+  2. Beat until smooth
+  ```
 
 ### Form Behavior
 - Auto-save draft to prevent data loss (optional for v1.0)
@@ -311,6 +392,54 @@ Ingredient groups allow users to organize ingredients under titled sections (e.g
 6. Verify recipe saves successfully
 7. Verify .md file contains `## Base` heading with its ingredients
 
+### TC-047: Add recipe with instruction groups
+1. Tap + button to add recipe
+2. Enter title: "Cinnamon Rolls"
+3. Add ingredients: "3 cups flour", "1 tsp salt"
+4. Enter ungrouped instructions: "Preheat oven to 375°F."
+5. Tap "+ Add Instruction Group"
+6. Enter group title: "Make the Dough"
+7. Enter group instructions: "1. Mix flour and salt\n2. Knead until smooth"
+8. Tap Save
+9. Verify .md file instructions contain ungrouped text followed by `## Make the Dough` heading and its text
+
+### TC-048: Add recipe with multiple instruction groups
+1. Tap + button to add recipe
+2. Enter title: "Layer Cake"
+3. Add ingredients
+4. Add instruction group "Make the Cake" with instructions
+5. Add instruction group "Make the Frosting" with instructions
+6. Tap Save
+7. Verify .md file instructions contain `## Make the Cake` then `## Make the Frosting`, each followed by their text
+
+### TC-049: Remove instruction group during add
+1. Tap + button to add recipe
+2. Enter title and ingredients
+3. Tap "+ Add Instruction Group"
+4. Tap the delete button (✕) on the group header
+5. Verify confirmation dialog: "Delete group and its instructions?"
+6. Confirm deletion
+7. Verify the group is removed from the form
+
+### TC-050: Instruction group with empty title validation
+1. Tap + button to add recipe
+2. Enter title and ingredients
+3. Tap "+ Add Instruction Group"
+4. Leave the group title empty
+5. Enter instructions in the group
+6. Tap Save
+7. Verify validation error: "Group title is required"
+
+### TC-051: Add recipe with instructions only in groups
+1. Tap + button to add recipe
+2. Enter title: "Simple Sauce"
+3. Add ingredients
+4. Leave ungrouped instructions empty
+5. Add group "Steps" with "1. Simmer tomatoes\n2. Add seasoning"
+6. Tap Save
+7. Verify recipe saves successfully
+8. Verify .md file instructions contain `## Steps` heading with its text
+
 ## Open Questions
 - Auto-save drafts? (Prevent data loss)
 - Markdown preview for instructions? (v2.0)
@@ -318,3 +447,4 @@ Ingredient groups allow users to organize ingredients under titled sections (e.g
 - Photo upload? (RecipeMD supports markdown images)
 - Should users be able to reorder ingredient groups via drag-and-drop? (v2.0)
 - Should users be able to move ingredients between groups? (v2.0)
+- Should users be able to reorder instruction groups via drag-and-drop? (v2.0)
