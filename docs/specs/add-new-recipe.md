@@ -22,7 +22,11 @@ Create new recipes using a form-based UI that maps to RecipeMD format structure.
 
 - [ ] Form with fields for: title, description, tags, yields
 - [ ] Ingredients entry with amount and name fields (list with add/remove rows)
-- [ ] Optional ingredient grouping with group titles
+- [ ] User can add ingredient groups with a title and a list of ingredients
+- [ ] User can remove ingredient groups
+- [ ] User can rename ingredient group titles
+- [ ] Ingredients not in any group remain in a default ungrouped section
+- [ ] Ingredient groups serialize to RecipeMD H2 headings with their ingredient lists
 - [ ] Instructions entry (multi-line markdown text)
 - [ ] Save button creates valid RecipeMD file in iCloud folder
 - [ ] File naming convention (e.g., title-slugified.md)
@@ -42,9 +46,55 @@ Generate valid markdown following specification:
 - List items with optional italic amounts for ingredients
 - Remaining content for instructions
 
+### Ingredient Groups
+Ingredient groups allow users to organize ingredients under titled sections (e.g., "For the Dough", "For the Filling"). Groups are optional — by default, ingredients appear in a flat ungrouped list.
+
+**Data Model**:
+- The form maintains an ordered list of ingredient sections
+- Each section is either ungrouped (no title) or a named group (has a title)
+- The first section is always the ungrouped/default section
+- Named groups appear after the ungrouped section
+- Groups are one level deep only — no nested groups
+
+**Adding a Group**:
+- "+ Add Ingredient Group" button appears below the ingredients section
+- Tapping it appends a new group with an empty title and one empty ingredient row
+- User enters a group title (e.g., "For the Frosting")
+- Group title is required and validated to be non-empty
+
+**Removing a Group**:
+- Each group header has a delete button
+- Deleting a group removes the group title and all its ingredients
+- Confirmation dialog: "Delete group and its ingredients?"
+- The ungrouped section cannot be deleted
+
+**Editing a Group**:
+- Group title is an editable text field in the group header
+- Ingredients within a group use the same add/remove/edit behavior as ungrouped ingredients
+- Each group has its own "+ Add Ingredient" button
+
+**Serialization**:
+- Ungrouped ingredients serialize as a plain list after the first `---`
+- Each named group serializes as an H2 heading followed by its ingredient list
+- Example output:
+  ```markdown
+  ---
+
+  - *2 cups* all-purpose flour
+  - *1 tsp* salt
+
+  ## For the Filling
+
+  - *1 cup* cream cheese
+  - *1/2 cup* sugar
+
+  ---
+  ```
+
 ### Form Validation
 - Title: Required, non-empty, < 200 chars
-- Ingredients: At least 1 required
+- Ingredients: At least 1 required (across ungrouped + all groups)
+- Ingredient group titles: Required, non-empty when a group exists
 - File name: Slug from title, ensure uniqueness
 - Tags: Optional, comma-separated
 - Yields: Optional, comma-separated
@@ -92,12 +142,25 @@ Generate valid markdown following specification:
 │                             │
 │ Ingredients *               │
 │ ┌───────────┬─────────────┐ │
-│ │ 2 cups    │ flour       │ │ ← Row 1
+│ │ 2 cups    │ flour       │ │ ← Ungrouped ingredients
 │ └───────────┴─────────────┘ │
 │ ┌───────────┬─────────────┐ │
-│ │ 1 tsp     │ salt        │ │ ← Row 2
+│ │ 1 tsp     │ salt        │ │
 │ └───────────┴─────────────┘ │
 │ + Add Ingredient            │
+│                             │
+│ ┌─────────────────────── ✕ ┐│
+│ │ For the Filling          ││ ← Group header (editable title + delete)
+│ └──────────────────────────┘│
+│ ┌───────────┬─────────────┐ │
+│ │ 1 cup     │ cream cheese│ │ ← Group ingredients
+│ └───────────┴─────────────┘ │
+│ ┌───────────┬─────────────┐ │
+│ │ 1/2 cup   │ sugar       │ │
+│ └───────────┴─────────────┘ │
+│ + Add Ingredient            │ ← Per-group add button
+│                             │
+│ + Add Ingredient Group      │ ← Adds a new named group
 │                             │
 │ Instructions                │
 │ ┌─────────────────────────┐ │
@@ -117,6 +180,12 @@ Generate valid markdown following specification:
   - Name field (right, wide, required)
   - Delete button (swipe left or minus icon)
   - "+ Add Ingredient" button below list
+- **Ingredient Groups**: Optional named sections
+  - Each group has an editable title text field in the header
+  - Group delete button (✕) in the header row
+  - Each group has its own ingredient list and "+ Add Ingredient" button
+  - "+ Add Ingredient Group" button at the bottom of the entire ingredients section
+  - Groups are visually separated from ungrouped ingredients
 - **Instructions**: Multi-line text editor, supports markdown
 
 ### Form Behavior
@@ -194,9 +263,58 @@ Generate valid markdown following specification:
 3. Verify filename sanitized: "moms-special-cookies.md"
 4. Verify title preserved exactly in file content
 
+### TC-042: Add recipe with ingredient group
+1. Tap + button to add recipe
+2. Enter title: "Cinnamon Rolls"
+3. Add ungrouped ingredients: "3 cups flour", "1 tsp salt"
+4. Tap "+ Add Ingredient Group"
+5. Enter group title: "For the Filling"
+6. Add ingredients: "3/4 cup brown sugar", "2 tbsp cinnamon"
+7. Tap Save
+8. Verify recipe appears in list
+9. Verify .md file contains `## For the Filling` heading followed by its ingredients
+
+### TC-043: Add recipe with multiple ingredient groups
+1. Tap + button to add recipe
+2. Enter title: "Layer Cake"
+3. Add ungrouped ingredients: "2 cups flour"
+4. Add group "For the Frosting" with "1 cup butter", "2 cups powdered sugar"
+5. Add group "For the Filling" with "1 cup jam"
+6. Tap Save
+7. Verify .md file has ungrouped list, then `## For the Frosting`, then `## For the Filling`
+
+### TC-044: Remove ingredient group during add
+1. Tap + button to add recipe
+2. Enter title and ungrouped ingredients
+3. Tap "+ Add Ingredient Group"
+4. Tap the delete button (✕) on the group header
+5. Verify confirmation dialog: "Delete group and its ingredients?"
+6. Confirm deletion
+7. Verify the group is removed from the form
+
+### TC-045: Ingredient group with empty title validation
+1. Tap + button to add recipe
+2. Enter title: "Test Recipe"
+3. Add an ungrouped ingredient
+4. Tap "+ Add Ingredient Group"
+5. Leave the group title empty
+6. Add ingredients to the group
+7. Tap Save
+8. Verify validation error: "Group title is required"
+
+### TC-046: Add recipe with ingredients only in groups
+1. Tap + button to add recipe
+2. Enter title: "Simple Sauce"
+3. Leave ungrouped ingredients empty
+4. Add group "Base" with "1 can tomatoes", "1 tsp salt"
+5. Tap Save
+6. Verify recipe saves successfully
+7. Verify .md file contains `## Base` heading with its ingredients
+
 ## Open Questions
 - Auto-save drafts? (Prevent data loss)
-- Ingredient groups in add form? (v1.0: flat list, v2.0: groups)
 - Markdown preview for instructions? (v2.0)
 - Import from clipboard? (Parse text and pre-fill form)
 - Photo upload? (RecipeMD supports markdown images)
+- Should users be able to reorder ingredient groups via drag-and-drop? (v2.0)
+- Should users be able to move ingredients between groups? (v2.0)

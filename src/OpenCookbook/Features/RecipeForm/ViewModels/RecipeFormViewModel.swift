@@ -43,35 +43,36 @@ struct EditableIngredient: Identifiable {
         }
 
         // Parse amount string into Amount
-        let parsedAmount = parseAmount(trimmedAmount)
-        return Ingredient(name: trimmedName, amount: parsedAmount)
+        if let parsedAmount = parseAmount(trimmedAmount) {
+            return Ingredient(name: trimmedName, amount: parsedAmount)
+        }
+
+        // Non-numeric amount text (e.g., "pinch") — fold into ingredient name
+        return Ingredient(name: "\(trimmedAmount) \(trimmedName)")
     }
 
-    /// Parse amount string into library Amount type
+    /// Parse amount string into library Amount type.
+    /// Returns nil if the text cannot be parsed as a numeric amount.
     private func parseAmount(_ amountString: String) -> Amount? {
         guard !amountString.isEmpty else { return nil }
 
         let parts = amountString.split(separator: " ", maxSplits: 1)
 
         if parts.count >= 2 {
-            // Has both quantity and unit
+            // Has both quantity and unit (e.g., "2 cups")
             let quantityStr = String(parts[0])
             let unit = String(parts[1])
 
             if let quantity = parseQuantity(quantityStr) {
                 return Amount(quantity, unit: unit)
-            } else {
-                // Treat whole string as rawText
-                return Amount(amount: 0, unit: nil, rawText: amountString)
             }
+            return nil
         } else if parts.count == 1 {
             let firstPart = String(parts[0])
             if let quantity = parseQuantity(firstPart) {
                 return Amount(quantity, unit: nil)
-            } else {
-                // Might be just a unit like "pinch"
-                return Amount(amount: 0, unit: firstPart, rawText: firstPart)
             }
+            return nil
         }
 
         return nil
@@ -96,6 +97,24 @@ struct EditableIngredient: Identifiable {
     /// Check if this ingredient has valid content
     var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+}
+
+/// Represents an editable ingredient group in the form
+struct EditableIngredientGroup: Identifiable {
+    let id: UUID
+    var title: String
+    var ingredients: [EditableIngredient]
+
+    init(id: UUID = UUID(), title: String = "", ingredients: [EditableIngredient] = [EditableIngredient()]) {
+        self.id = id
+        self.title = title
+        self.ingredients = ingredients
+    }
+
+    /// Check if this group has at least one valid ingredient
+    var hasValidIngredients: Bool {
+        ingredients.contains { $0.isValid }
     }
 }
 
@@ -135,6 +154,7 @@ class RecipeFormViewModel {
     var tagsText: String = ""
     var yieldsText: String = ""
     var ingredients: [EditableIngredient] = [EditableIngredient()]
+    var ingredientGroups: [EditableIngredientGroup] = []
     var instructions: String = ""
 
     // MARK: - State
@@ -208,6 +228,11 @@ class RecipeFormViewModel {
         validationErrors.contains { $0.field == "ingredients" }
     }
 
+    /// Check if any ingredient group title has error
+    var groupTitleHasError: Bool {
+        validationErrors.contains { $0.field == "groupTitle" }
+    }
+
     // MARK: - Public Methods
 
     /// Add a new empty ingredient row and return its ID
@@ -224,6 +249,44 @@ class RecipeFormViewModel {
         // Ensure at least one ingredient row
         if ingredients.isEmpty {
             ingredients.append(EditableIngredient())
+        }
+    }
+
+    // MARK: - Ingredient Group Methods
+
+    /// Add a new empty ingredient group and return its ID
+    @discardableResult
+    func addIngredientGroup() -> UUID {
+        let group = EditableIngredientGroup()
+        ingredientGroups.append(group)
+        return group.id
+    }
+
+    /// Remove an ingredient group by ID
+    func removeIngredientGroup(id: UUID) {
+        ingredientGroups.removeAll { $0.id == id }
+    }
+
+    /// Add a new empty ingredient to a group and return its ID
+    @discardableResult
+    func addIngredientToGroup(groupId: UUID) -> UUID? {
+        guard let index = ingredientGroups.firstIndex(where: { $0.id == groupId }) else {
+            return nil
+        }
+        let newIngredient = EditableIngredient()
+        ingredientGroups[index].ingredients.append(newIngredient)
+        return newIngredient.id
+    }
+
+    /// Remove an ingredient from a group at the given offsets
+    func removeIngredientFromGroup(groupId: UUID, at offsets: IndexSet) {
+        guard let index = ingredientGroups.firstIndex(where: { $0.id == groupId }) else {
+            return
+        }
+        ingredientGroups[index].ingredients.remove(atOffsets: offsets)
+        // Ensure at least one ingredient row in group
+        if ingredientGroups[index].ingredients.isEmpty {
+            ingredientGroups[index].ingredients.append(EditableIngredient())
         }
     }
 
@@ -246,13 +309,25 @@ class RecipeFormViewModel {
             ))
         }
 
-        // Ingredients validation
-        let validIngredients = ingredients.filter { $0.isValid }
-        if validIngredients.isEmpty {
+        // Ingredients validation - check ungrouped + all groups
+        let validUngrouped = ingredients.filter { $0.isValid }
+        let validGrouped = ingredientGroups.flatMap { $0.ingredients.filter { $0.isValid } }
+        if validUngrouped.isEmpty && validGrouped.isEmpty {
             validationErrors.append(RecipeValidationError(
                 field: "ingredients",
                 message: "At least one ingredient is required"
             ))
+        }
+
+        // Ingredient group title validation
+        for group in ingredientGroups {
+            if group.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                validationErrors.append(RecipeValidationError(
+                    field: "groupTitle",
+                    message: "Group title is required"
+                ))
+                break
+            }
         }
 
         return validationErrors.isEmpty
@@ -338,13 +413,37 @@ class RecipeFormViewModel {
         // Format yields from Yield type
         yieldsText = recipe.yield.formatted
 
-        // Convert ingredients from all groups
-        let allIngredients = recipe.ingredientGroups.flatMap { $0.allIngredients }
-        if allIngredients.isEmpty {
-            ingredients = [EditableIngredient()]
-        } else {
-            ingredients = allIngredients.map { EditableIngredient(from: $0) }
+        // Populate ingredients preserving group structure
+        populateIngredientGroups(from: recipe.ingredientGroups)
+    }
+
+    /// Populate ingredient sections from parsed ingredient groups
+    private func populateIngredientGroups(from groups: [IngredientGroup]) {
+        var ungrouped: [EditableIngredient] = []
+        var named: [EditableIngredientGroup] = []
+
+        for group in groups {
+            let editableIngredients = group.ingredients.map { EditableIngredient(from: $0) }
+
+            if group.title != nil && !group.title!.isEmpty {
+                // Named group
+                named.append(EditableIngredientGroup(
+                    title: group.title!,
+                    ingredients: editableIngredients.isEmpty ? [EditableIngredient()] : editableIngredients
+                ))
+            } else {
+                // Ungrouped
+                ungrouped.append(contentsOf: editableIngredients)
+            }
         }
+
+        if ungrouped.isEmpty && !named.isEmpty {
+            // Recipe has only named groups — no need for an empty ungrouped section
+            ingredients = []
+        } else {
+            ingredients = ungrouped.isEmpty ? [EditableIngredient()] : ungrouped
+        }
+        ingredientGroups = named
     }
 
     /// Build a RecipeFile from the current form state
@@ -365,13 +464,28 @@ class RecipeFormViewModel {
             }
         let yield = Yield(amount: yieldAmounts)
 
-        // Convert editable ingredients to library Ingredient models
-        let recipeIngredients = ingredients
+        // Build ingredient groups
+        var allGroups: [IngredientGroup] = []
+
+        // Ungrouped ingredients (no title)
+        let ungroupedIngredients = ingredients
             .filter { $0.isValid }
             .map { $0.toIngredient() }
+        if !ungroupedIngredients.isEmpty {
+            allGroups.append(IngredientGroup(ingredients: ungroupedIngredients))
+        }
 
-        // Create a single ingredient group with all ingredients
-        let ingredientGroup = IngredientGroup(ingredients: recipeIngredients)
+        // Named groups
+        for group in ingredientGroups {
+            let groupIngredients = group.ingredients
+                .filter { $0.isValid }
+                .map { $0.toIngredient() }
+            let trimmedTitle = group.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            allGroups.append(IngredientGroup(
+                title: trimmedTitle.isEmpty ? nil : trimmedTitle,
+                ingredients: groupIngredients
+            ))
+        }
 
         // Build the library Recipe
         let recipe = Recipe(
@@ -379,7 +493,7 @@ class RecipeFormViewModel {
             description: descriptionText.isEmpty ? nil : descriptionText,
             tags: tags,
             yield: yield,
-            ingredientGroups: [ingredientGroup],
+            ingredientGroups: allGroups,
             instructions: instructions.isEmpty ? nil : instructions
         )
 
@@ -438,6 +552,12 @@ class RecipeFormViewModel {
             tags: tagsText,
             yields: yieldsText,
             ingredients: ingredients.map { "\($0.amount)|\($0.name)" },
+            groups: ingredientGroups.map { group in
+                GroupState(
+                    title: group.title,
+                    ingredients: group.ingredients.map { "\($0.amount)|\($0.name)" }
+                )
+            },
             instructions: instructions
         )
     }
@@ -449,6 +569,13 @@ class RecipeFormViewModel {
         let tags: String
         let yields: String
         let ingredients: [String]
+        let groups: [GroupState]
         let instructions: String
+    }
+
+    /// Group state for change detection
+    private struct GroupState: Equatable {
+        let title: String
+        let ingredients: [String]
     }
 }
