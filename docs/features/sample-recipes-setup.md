@@ -5,7 +5,7 @@ Sample RecipeMD recipes have been added to the app bundle for testing in the sim
 
 ## What Was Added
 
-### Sample Recipe Files (5 recipes)
+### Sample Recipe Files (6 recipes)
 Located in `src/OpenCookbook/Resources/SampleRecipes/`:
 
 1. **Guacamole.md** - Classic Mexican dip (appetizer, vegan, mexican)
@@ -13,6 +13,7 @@ Located in `src/OpenCookbook/Resources/SampleRecipes/`:
 3. **Spaghetti Carbonara.md** - Italian pasta dish (pasta, italian, dinner)
 4. **Green Smoothie.md** - Healthy breakfast smoothie (breakfast, vegan, healthy)
 5. **Margherita Pizza.md** - Pizza with ingredient groups (dinner, italian, vegetarian)
+6. **Cinnamon Rolls.md** - Rolls with 3 ingredient groups: dough, filling, frosting (breakfast, baking, dessert)
 
 All recipes follow the RecipeMD v2.4.0 specification from https://recipemd.org/specification.html
 
@@ -61,7 +62,8 @@ CpResource .../OpenCookbook.app/Spaghetti Carbonara.md
 The sample recipes test various RecipeMD features:
 - Basic recipes with simple ingredients (Guacamole, Green Smoothie)
 - Longer recipes with more ingredients (Chocolate Chip Cookies, Spaghetti Carbonara)
-- Recipes with ingredient groups (Margherita Pizza - "For the dough", "For the topping")
+- Recipes with 2 ingredient groups (Margherita Pizza - "For the dough", "For the topping")
+- Recipes with 3 ingredient groups (Cinnamon Rolls - "For the Dough", "For the Filling", "For the Frosting")
 - Different tags and categories
 - Various yields formats
 

@@ -237,6 +237,35 @@ struct RecipeFormViewModelTests {
         #expect(!editable.amount.isEmpty)
     }
 
+    @Test("Non-numeric amount folds into ingredient name")
+    func nonNumericAmountFoldsIntoName() {
+        let editable = EditableIngredient(amount: "pinch", name: "basil")
+        let ingredient = editable.toIngredient()
+
+        #expect(ingredient.amount == nil)
+        #expect(ingredient.name == "pinch basil")
+    }
+
+    @Test("Non-numeric multi-word amount folds into ingredient name")
+    func nonNumericMultiWordAmountFoldsIntoName() {
+        let editable = EditableIngredient(amount: "1c", name: "flour")
+        let ingredient = editable.toIngredient()
+
+        #expect(ingredient.amount == nil)
+        #expect(ingredient.name == "1c flour")
+    }
+
+    @Test("Numeric amount with unit parses correctly")
+    func numericAmountWithUnitParsesCorrectly() {
+        let editable = EditableIngredient(amount: "1 T", name: "romano cheese")
+        let ingredient = editable.toIngredient()
+
+        #expect(ingredient.amount != nil)
+        #expect(ingredient.amount?.amount == 1.0)
+        #expect(ingredient.amount?.unit == "T")
+        #expect(ingredient.name == "romano cheese")
+    }
+
     @Test("Validates editable ingredient")
     func validatesEditableIngredient() {
         let valid = EditableIngredient(amount: "1 cup", name: "flour")
@@ -440,5 +469,257 @@ struct RecipeFormViewModelTests {
         // Should succeed with forceOverwrite: true
         let savedRecipe = try await viewModel.save(to: tempDir, using: store, forceOverwrite: true)
         #expect(savedRecipe.title == "Test Recipe")
+    }
+
+    // MARK: - Ingredient Group Tests
+
+    @Test("Initializes with empty ingredient groups in add mode")
+    func initializesWithEmptyGroups() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+
+        #expect(viewModel.ingredientGroups.isEmpty)
+    }
+
+    @Test("Adds ingredient group")
+    func addsIngredientGroup() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+
+        let groupId = viewModel.addIngredientGroup()
+
+        #expect(viewModel.ingredientGroups.count == 1)
+        #expect(viewModel.ingredientGroups.first?.id == groupId)
+        #expect(viewModel.ingredientGroups.first?.title == "")
+        #expect(viewModel.ingredientGroups.first?.ingredients.count == 1)
+    }
+
+    @Test("Removes ingredient group")
+    func removesIngredientGroup() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        let groupId = viewModel.addIngredientGroup()
+
+        viewModel.removeIngredientGroup(id: groupId)
+
+        #expect(viewModel.ingredientGroups.isEmpty)
+    }
+
+    @Test("Adds ingredient to group")
+    func addsIngredientToGroup() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        let groupId = viewModel.addIngredientGroup()
+        let initialCount = viewModel.ingredientGroups[0].ingredients.count
+
+        let newId = viewModel.addIngredientToGroup(groupId: groupId)
+
+        #expect(newId != nil)
+        #expect(viewModel.ingredientGroups[0].ingredients.count == initialCount + 1)
+    }
+
+    @Test("Removes ingredient from group keeping at least one")
+    func removesIngredientFromGroupKeepsOne() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        let groupId = viewModel.addIngredientGroup()
+        #expect(viewModel.ingredientGroups[0].ingredients.count == 1)
+
+        viewModel.removeIngredientFromGroup(groupId: groupId, at: IndexSet(integer: 0))
+
+        #expect(viewModel.ingredientGroups[0].ingredients.count == 1)
+    }
+
+    @Test("Populates ingredient groups from existing recipe")
+    func populatesGroupsFromExistingRecipe() {
+        let recipe = Recipe(
+            title: "Cinnamon Rolls",
+            ingredientGroups: [
+                IngredientGroup(ingredients: [
+                    Ingredient(name: "flour", amount: Amount(3, unit: "cups"))
+                ]),
+                IngredientGroup(
+                    title: "For the Filling",
+                    ingredients: [
+                        Ingredient(name: "brown sugar", amount: Amount(0.75, unit: "cup")),
+                        Ingredient(name: "cinnamon", amount: Amount(2, unit: "tbsp"))
+                    ]
+                ),
+                IngredientGroup(
+                    title: "For the Frosting",
+                    ingredients: [
+                        Ingredient(name: "cream cheese", amount: Amount(4, unit: "oz"))
+                    ]
+                )
+            ]
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: URL(fileURLWithPath: "/tmp/test.md"),
+            recipe: recipe
+        )
+
+        let viewModel = RecipeFormViewModel(mode: .edit(recipeFile))
+
+        // Ungrouped ingredients (from the untitled group)
+        #expect(viewModel.ingredients.count == 1)
+        #expect(viewModel.ingredients[0].name == "flour")
+
+        // Named groups
+        #expect(viewModel.ingredientGroups.count == 2)
+        #expect(viewModel.ingredientGroups[0].title == "For the Filling")
+        #expect(viewModel.ingredientGroups[0].ingredients.count == 2)
+        #expect(viewModel.ingredientGroups[1].title == "For the Frosting")
+        #expect(viewModel.ingredientGroups[1].ingredients.count == 1)
+    }
+
+    @Test("Populates flat list when recipe has single unnamed group")
+    func populatesFlatListForSingleUnnamedGroup() {
+        let recipe = Recipe(
+            title: "Simple Recipe",
+            ingredientGroups: [
+                IngredientGroup(ingredients: [
+                    Ingredient(name: "flour", amount: Amount(2, unit: "cups")),
+                    Ingredient(name: "sugar", amount: Amount(1, unit: "cup"))
+                ])
+            ]
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: URL(fileURLWithPath: "/tmp/test.md"),
+            recipe: recipe
+        )
+
+        let viewModel = RecipeFormViewModel(mode: .edit(recipeFile))
+
+        #expect(viewModel.ingredients.count == 2)
+        #expect(viewModel.ingredientGroups.isEmpty)
+    }
+
+    @Test("Validates group title is required")
+    func validatesGroupTitleRequired() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "Test Recipe"
+        viewModel.ingredients = [EditableIngredient(amount: "", name: "flour")]
+        viewModel.addIngredientGroup()
+        // Leave group title empty
+
+        let isValid = viewModel.validate()
+
+        #expect(isValid == false)
+        #expect(viewModel.groupTitleHasError == true)
+    }
+
+    @Test("Validates successfully with valid group title")
+    func validatesWithValidGroupTitle() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "Test Recipe"
+        viewModel.ingredients = [EditableIngredient(amount: "", name: "flour")]
+        viewModel.addIngredientGroup()
+        viewModel.ingredientGroups[0].title = "For the Sauce"
+        viewModel.ingredientGroups[0].ingredients = [EditableIngredient(amount: "1 cup", name: "tomatoes")]
+
+        let isValid = viewModel.validate()
+
+        #expect(isValid == true)
+    }
+
+    @Test("Validates with ingredients only in groups")
+    func validatesWithIngredientsOnlyInGroups() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "Test Recipe"
+        // No ungrouped ingredients (only empty default)
+        viewModel.ingredients = [EditableIngredient()]
+        viewModel.addIngredientGroup()
+        viewModel.ingredientGroups[0].title = "Sauce"
+        viewModel.ingredientGroups[0].ingredients = [EditableIngredient(amount: "1 cup", name: "tomatoes")]
+
+        let isValid = viewModel.validate()
+
+        #expect(isValid == true)
+    }
+
+    @Test("Builds RecipeFile with ingredient groups")
+    func buildsRecipeFileWithGroups() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("group-build-test-\(UUID().uuidString).md")
+        try "".write(to: testFile, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: testFile) }
+
+        let recipe = Recipe(
+            title: "Test",
+            ingredientGroups: [IngredientGroup(ingredients: [Ingredient(name: "flour")])]
+        )
+        let recipeFile = RecipeFile(filePath: testFile, recipe: recipe, fileModifiedDate: Date())
+
+        let viewModel = RecipeFormViewModel(mode: .edit(recipeFile))
+        viewModel.title = "Test"
+        viewModel.ingredients = [EditableIngredient(amount: "2 cups", name: "flour")]
+        viewModel.addIngredientGroup()
+        viewModel.ingredientGroups[0].title = "For the Glaze"
+        viewModel.ingredientGroups[0].ingredients = [EditableIngredient(amount: "1 cup", name: "powdered sugar")]
+
+        let store = RecipeStore()
+        let saved = try await viewModel.save(to: tempDir, using: store, forceOverwrite: true)
+
+        #expect(saved.recipe.ingredientGroups.count == 2)
+        // First group: ungrouped
+        #expect(saved.recipe.ingredientGroups[0].title == nil)
+        #expect(saved.recipe.ingredientGroups[0].ingredients.count == 1)
+        #expect(saved.recipe.ingredientGroups[0].ingredients[0].name == "flour")
+        // Second group: named
+        #expect(saved.recipe.ingredientGroups[1].title == "For the Glaze")
+        #expect(saved.recipe.ingredientGroups[1].ingredients.count == 1)
+        #expect(saved.recipe.ingredientGroups[1].ingredients[0].name == "powdered sugar")
+    }
+
+    @Test("Hides ungrouped section when recipe has only named groups")
+    func hidesUngroupedForOnlyNamedGroups() {
+        let recipe = Recipe(
+            title: "Cinnamon Rolls",
+            ingredientGroups: [
+                IngredientGroup(
+                    title: "For the Dough",
+                    ingredients: [Ingredient(name: "flour", amount: Amount(3, unit: "cups"))]
+                ),
+                IngredientGroup(
+                    title: "For the Filling",
+                    ingredients: [Ingredient(name: "brown sugar", amount: Amount(0.75, unit: "cup"))]
+                )
+            ]
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: URL(fileURLWithPath: "/tmp/test.md"),
+            recipe: recipe
+        )
+
+        let viewModel = RecipeFormViewModel(mode: .edit(recipeFile))
+
+        #expect(viewModel.ingredients.isEmpty)
+        #expect(viewModel.ingredientGroups.count == 2)
+    }
+
+    @Test("Detects ingredient group changes")
+    func detectsIngredientGroupChanges() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        #expect(viewModel.hasUnsavedChanges == false)
+
+        viewModel.addIngredientGroup()
+
+        #expect(viewModel.hasUnsavedChanges == true)
+    }
+
+    @Test("Detects group title changes")
+    func detectsGroupTitleChanges() {
+        let recipe = Recipe(
+            title: "Test",
+            ingredientGroups: [
+                IngredientGroup(ingredients: [Ingredient(name: "flour")]),
+                IngredientGroup(title: "Sauce", ingredients: [Ingredient(name: "tomato")])
+            ]
+        )
+        let recipeFile = RecipeFile(filePath: URL(fileURLWithPath: "/tmp/test.md"), recipe: recipe)
+        let viewModel = RecipeFormViewModel(mode: .edit(recipeFile))
+        #expect(viewModel.hasUnsavedChanges == false)
+
+        viewModel.ingredientGroups[0].title = "New Sauce Name"
+
+        #expect(viewModel.hasUnsavedChanges == true)
     }
 }
