@@ -176,4 +176,87 @@ struct PortionScalingTests {
         let scaled = amount.formattedScaled(by: 0.5)
         #expect(scaled == "50 g")
     }
+
+    // MARK: - Unicode Fraction Formatting Tests
+
+    @Test("formatFractionUnicode converts all 9 standard fractions")
+    func fractionUnicodeStandardFractions() {
+        #expect(Amount.formatFractionUnicode(0.125) == "⅛")
+        #expect(Amount.formatFractionUnicode(0.25) == "¼")
+        #expect(Amount.formatFractionUnicode(1.0/3.0) == "⅓")
+        #expect(Amount.formatFractionUnicode(0.375) == "⅜")
+        #expect(Amount.formatFractionUnicode(0.5) == "½")
+        #expect(Amount.formatFractionUnicode(0.625) == "⅝")
+        #expect(Amount.formatFractionUnicode(2.0/3.0) == "⅔")
+        #expect(Amount.formatFractionUnicode(0.75) == "¾")
+        #expect(Amount.formatFractionUnicode(0.875) == "⅞")
+    }
+
+    @Test("formatFractionUnicode handles mixed numbers")
+    func fractionUnicodeMixedNumbers() {
+        #expect(Amount.formatFractionUnicode(1.5) == "1½")
+        #expect(Amount.formatFractionUnicode(2.25) == "2¼")
+        #expect(Amount.formatFractionUnicode(3.75) == "3¾")
+        #expect(Amount.formatFractionUnicode(1.0 + 2.0/3.0) == "1⅔")
+    }
+
+    @Test("formatFractionUnicode handles whole numbers")
+    func fractionUnicodeWholeNumbers() {
+        #expect(Amount.formatFractionUnicode(1.0) == "1")
+        #expect(Amount.formatFractionUnicode(5.0) == "5")
+        #expect(Amount.formatFractionUnicode(0.0) == "0")
+    }
+
+    @Test("formatFractionUnicode falls back to decimal for unrecognized fractions")
+    func fractionUnicodeFallback() {
+        // pi has no standard fraction representation
+        let result = Amount.formatFractionUnicode(3.1415)
+        #expect(result == "3.14")
+    }
+
+    // MARK: - Format-Aware Scaling Tests
+
+    @Test("formattedScaled with decimal format")
+    func formattedScaledDecimalFormat() {
+        let amount = Amount(0.5, unit: "cup")
+        let result = amount.formattedScaled(by: 1.0, format: .decimal)
+        #expect(result == "0.5 cup")
+    }
+
+    @Test("formattedScaled with fraction format")
+    func formattedScaledFractionFormat() {
+        let amount = Amount(0.5, unit: "cup")
+        let result = amount.formattedScaled(by: 1.0, format: .fraction)
+        #expect(result == "½ cup")
+    }
+
+    @Test("formattedScaled with fraction format and scaling")
+    func formattedScaledFractionFormatScaled() {
+        let amount = Amount(1, unit: "cup")
+        let result = amount.formattedScaled(by: 1.5, format: .fraction)
+        #expect(result == "1½ cup")
+    }
+
+    @Test("formattedScaled with original format at 1x returns rawText")
+    func formattedScaledOriginalAt1x() {
+        let amount = Amount(amount: 0.5, unit: "cup", rawText: "1/2")
+        let result = amount.formattedScaled(by: 1.0, format: .original)
+        #expect(result == "1/2 cup")
+    }
+
+    @Test("formattedScaled with original format at non-1x falls back to fraction")
+    func formattedScaledOriginalScaled() {
+        let amount = Amount(amount: 0.5, unit: "cup", rawText: "1/2")
+        let result = amount.formattedScaled(by: 2.0, format: .original)
+        #expect(result == "1 cup")
+    }
+
+    @Test("Whole numbers display identically in decimal and fraction formats")
+    func wholeNumberConsistentAcrossFormats() {
+        let amount = Amount(2, unit: "cups")
+        let decimal = amount.formattedScaled(by: 1.0, format: .decimal)
+        let fraction = amount.formattedScaled(by: 1.0, format: .fraction)
+        #expect(decimal == "2 cups")
+        #expect(decimal == fraction)
+    }
 }

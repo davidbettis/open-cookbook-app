@@ -55,6 +55,12 @@ private struct IngredientRowDisplayView: View {
     let ingredient: Ingredient
     var portionMultiplier: Double = 1.0
 
+    @AppStorage("amountDisplayFormat") private var amountDisplayFormatRaw: String = AmountDisplayFormat.original.rawValue
+
+    private var amountFormat: AmountDisplayFormat {
+        AmountDisplayFormat(rawValue: amountDisplayFormatRaw) ?? .original
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
             // Bullet point
@@ -75,7 +81,7 @@ private struct IngredientRowDisplayView: View {
 
     private var displayText: String {
         if let amount = ingredient.amount {
-            let scaledAmount = amount.formattedScaled(by: portionMultiplier)
+            let scaledAmount = amount.formattedScaled(by: portionMultiplier, format: amountFormat)
             return "\(scaledAmount) \(ingredient.name)"
         }
         return ingredient.name
