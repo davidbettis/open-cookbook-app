@@ -118,6 +118,21 @@ struct EditableIngredientGroup: Identifiable {
     }
 }
 
+/// Represents an editable instruction group in the form
+struct EditableInstructionGroup: Identifiable {
+    let id: UUID
+    var title: String    // empty string for ungrouped
+    var text: String     // the instruction content
+
+    var isUngrouped: Bool { title.isEmpty }
+
+    init(id: UUID = UUID(), title: String = "", text: String = "") {
+        self.id = id
+        self.title = title
+        self.text = text
+    }
+}
+
 /// Mode for the recipe form
 enum RecipeFormMode: Equatable {
     case add
@@ -155,7 +170,7 @@ class RecipeFormViewModel {
     var yieldsText: String = ""
     var ingredients: [EditableIngredient] = [EditableIngredient()]
     var ingredientGroups: [EditableIngredientGroup] = []
-    var instructions: String = ""
+    var instructionGroups: [EditableInstructionGroup] = [EditableInstructionGroup()]
 
     // MARK: - State
 
@@ -233,6 +248,11 @@ class RecipeFormViewModel {
         validationErrors.contains { $0.field == "groupTitle" }
     }
 
+    /// Check if any instruction group title has error
+    var instructionGroupTitleHasError: Bool {
+        validationErrors.contains { $0.field == "instructionGroupTitle" }
+    }
+
     // MARK: - Public Methods
 
     /// Add a new empty ingredient row and return its ID
@@ -290,6 +310,23 @@ class RecipeFormViewModel {
         }
     }
 
+    // MARK: - Instruction Group Methods
+
+    /// Add a new instruction group and return its ID
+    @discardableResult
+    func addInstructionGroup() -> UUID {
+        let newGroup = EditableInstructionGroup(title: "New Group")
+        instructionGroups.append(newGroup)
+        return newGroup.id
+    }
+
+    /// Remove instruction group by ID (cannot remove ungrouped at index 0)
+    func removeInstructionGroup(id: UUID) {
+        guard let index = instructionGroups.firstIndex(where: { $0.id == id }),
+              index > 0 else { return }
+        instructionGroups.remove(at: index)
+    }
+
     /// Validate the form and update validationErrors
     @discardableResult
     func validate() -> Bool {
@@ -325,6 +362,17 @@ class RecipeFormViewModel {
                 validationErrors.append(RecipeValidationError(
                     field: "groupTitle",
                     message: "Group title is required"
+                ))
+                break
+            }
+        }
+
+        // Instruction group title validation (skip index 0, which is ungrouped)
+        for group in instructionGroups.dropFirst() {
+            if group.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                validationErrors.append(RecipeValidationError(
+                    field: "instructionGroupTitle",
+                    message: "Instruction group titles cannot be empty"
                 ))
                 break
             }
@@ -408,7 +456,7 @@ class RecipeFormViewModel {
         title = recipe.title
         descriptionText = recipe.description ?? ""
         tagsText = recipe.tags.joined(separator: ", ")
-        instructions = recipe.instructions ?? ""
+        instructionGroups = parseInstructionsToGroups(recipe.instructions ?? "")
 
         // Format yields from Yield type
         yieldsText = recipe.yield.formatted
@@ -444,6 +492,64 @@ class RecipeFormViewModel {
             ingredients = ungrouped.isEmpty ? [EditableIngredient()] : ungrouped
         }
         ingredientGroups = named
+    }
+
+    /// Parse a raw instructions string into instruction groups by splitting on `## ` headings
+    func parseInstructionsToGroups(_ instructions: String) -> [EditableInstructionGroup] {
+        guard !instructions.isEmpty else {
+            return [EditableInstructionGroup()]
+        }
+
+        var groups: [EditableInstructionGroup] = []
+        var currentTitle = ""
+        var currentLines: [String] = []
+
+        for line in instructions.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("## ") {
+                // Save the previous group
+                let text = currentLines.joined(separator: "\n")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                groups.append(EditableInstructionGroup(title: currentTitle, text: text))
+
+                // Start a new group
+                currentTitle = String(trimmed.dropFirst(3))
+                    .trimmingCharacters(in: .whitespaces)
+                currentLines = []
+            } else {
+                currentLines.append(line)
+            }
+        }
+
+        // Save the last group
+        let text = currentLines.joined(separator: "\n")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        groups.append(EditableInstructionGroup(title: currentTitle, text: text))
+
+        return groups
+    }
+
+    /// Serialize instruction groups back into a single instructions string
+    func serializeInstructionGroups() -> String {
+        var parts: [String] = []
+
+        for group in instructionGroups {
+            let trimmedText = group.text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            if group.isUngrouped {
+                if !trimmedText.isEmpty {
+                    parts.append(trimmedText)
+                }
+            } else {
+                var section = "## \(group.title)"
+                if !trimmedText.isEmpty {
+                    section += "\n\n\(trimmedText)"
+                }
+                parts.append(section)
+            }
+        }
+
+        return parts.joined(separator: "\n\n")
     }
 
     /// Build a RecipeFile from the current form state
@@ -494,7 +600,7 @@ class RecipeFormViewModel {
             tags: tags,
             yield: yield,
             ingredientGroups: allGroups,
-            instructions: instructions.isEmpty ? nil : instructions
+            instructions: serializeInstructionGroups().isEmpty ? nil : serializeInstructionGroups()
         )
 
         // Get file path from original recipe or use placeholder
@@ -552,13 +658,15 @@ class RecipeFormViewModel {
             tags: tagsText,
             yields: yieldsText,
             ingredients: ingredients.map { "\($0.amount)|\($0.name)" },
-            groups: ingredientGroups.map { group in
-                GroupState(
+            ingredientGroups: ingredientGroups.map { group in
+                IngredientGroupState(
                     title: group.title,
                     ingredients: group.ingredients.map { "\($0.amount)|\($0.name)" }
                 )
             },
-            instructions: instructions
+            instructionGroups: instructionGroups.map { group in
+                InstructionGroupState(title: group.title, text: group.text)
+            }
         )
     }
 
@@ -569,13 +677,19 @@ class RecipeFormViewModel {
         let tags: String
         let yields: String
         let ingredients: [String]
-        let groups: [GroupState]
-        let instructions: String
+        let ingredientGroups: [IngredientGroupState]
+        let instructionGroups: [InstructionGroupState]
     }
 
-    /// Group state for change detection
-    private struct GroupState: Equatable {
+    /// Ingredient group state for change detection
+    private struct IngredientGroupState: Equatable {
         let title: String
         let ingredients: [String]
+    }
+
+    /// Instruction group state for change detection
+    private struct InstructionGroupState: Equatable {
+        let title: String
+        let text: String
     }
 }

@@ -32,11 +32,15 @@ Soft, fluffy homemade cinnamon rolls with a gooey cinnamon sugar filling and tan
 
 ---
 
+## Prepare the Dough
+
 Warm the milk to about 110°F. Stir in yeast and a pinch of sugar. Let stand for 5-10 minutes until foamy.
 
 In a large bowl, combine the yeast mixture with sugar, melted butter, and egg. Add flour and salt, mixing until a soft dough forms.
 
 Knead on a floured surface for 5-8 minutes until smooth and elastic. Place in a greased bowl, cover with a towel, and let rise in a warm spot for 1 hour until doubled.
+
+## Fill and Shape
 
 While the dough rises, prepare the filling by mixing softened butter, brown sugar, and cinnamon until well combined.
 
@@ -45,6 +49,8 @@ Punch down the dough and roll out on a floured surface into a 16x12 inch rectang
 Starting from the long edge opposite the border, roll the dough tightly into a log. Cut into 12 equal pieces using a sharp knife or dental floss.
 
 Place rolls in a greased 9x13 inch baking pan, leaving a little space between each. Cover and let rise for 30 minutes.
+
+## Bake and Frost
 
 Preheat oven to 350°F (175°C). Bake for 22-28 minutes until golden brown.
 

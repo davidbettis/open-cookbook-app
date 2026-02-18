@@ -38,6 +38,13 @@ struct InstructionsFormatter {
 
             // Check for stop triggers
             if isStopTrigger(trimmed) {
+                // Headings start a new instruction group — reset numbering
+                if isHeading(trimmed) {
+                    result.append(line)
+                    stepNumber = 1
+                    stopped = false
+                    continue
+                }
                 stopped = true
             }
 
@@ -71,6 +78,11 @@ struct InstructionsFormatter {
         }
 
         return false
+    }
+
+    /// Check if a line is a markdown heading (starts with #)
+    private func isHeading(_ line: String) -> Bool {
+        line.trimmingCharacters(in: .whitespaces).hasPrefix("#")
     }
 
     /// Check if a line is a stop trigger that ends auto-numbering

@@ -41,7 +41,8 @@ class SampleRecipeLoader {
             "Chocolate Chip Cookies.md",
             "Spaghetti Carbonara.md",
             "Green Smoothie.md",
-            "Margherita Pizza.md"
+            "Margherita Pizza.md",
+            "Cinnamon Rolls.md"
         ]
 
         // Create destination directory if it doesn't exist
