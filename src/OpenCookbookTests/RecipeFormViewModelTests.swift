@@ -23,7 +23,8 @@ struct RecipeFormViewModelTests {
         #expect(viewModel.descriptionText == "")
         #expect(viewModel.tagsText == "")
         #expect(viewModel.yieldsText == "")
-        #expect(viewModel.instructions == "")
+        #expect(viewModel.instructionGroups.count == 1)
+        #expect(viewModel.instructionGroups[0].text == "")
         #expect(viewModel.ingredients.count == 1)
         #expect(viewModel.mode == .add)
         #expect(viewModel.navigationTitle == "New Recipe")
@@ -53,7 +54,8 @@ struct RecipeFormViewModelTests {
         #expect(viewModel.title == "Test Recipe")
         #expect(viewModel.descriptionText == "Test description")
         #expect(viewModel.tagsText == "tag1, tag2")
-        #expect(viewModel.instructions == "Test instructions")
+        #expect(viewModel.instructionGroups.count == 1)
+        #expect(viewModel.instructionGroups[0].text == "Test instructions")
         #expect(viewModel.navigationTitle == "Edit Recipe")
         #expect(viewModel.saveButtonText == "Save Changes")
     }
@@ -721,5 +723,178 @@ struct RecipeFormViewModelTests {
         viewModel.ingredientGroups[0].title = "New Sauce Name"
 
         #expect(viewModel.hasUnsavedChanges == true)
+    }
+
+    // MARK: - Instruction Group Tests
+
+    @Test("Parses instructions with no headings into single ungrouped group")
+    func parsesInstructionsNoHeadings() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        let groups = viewModel.parseInstructionsToGroups("Preheat oven\nMix ingredients\nBake")
+
+        #expect(groups.count == 1)
+        #expect(groups[0].isUngrouped == true)
+        #expect(groups[0].text == "Preheat oven\nMix ingredients\nBake")
+    }
+
+    @Test("Parses instructions with headings into groups")
+    func parsesInstructionsWithHeadings() {
+        let input = "Preheat oven\nMix dough\n\n## Filling\n\nMix sugar and cinnamon\nSpread on dough"
+        let viewModel = RecipeFormViewModel(mode: .add)
+        let groups = viewModel.parseInstructionsToGroups(input)
+
+        #expect(groups.count == 2)
+        #expect(groups[0].isUngrouped == true)
+        #expect(groups[0].text == "Preheat oven\nMix dough")
+        #expect(groups[1].title == "Filling")
+        #expect(groups[1].text == "Mix sugar and cinnamon\nSpread on dough")
+    }
+
+    @Test("Parses instructions with only headings (no ungrouped text)")
+    func parsesInstructionsOnlyHeadings() {
+        let input = "## Dough\n\nMix flour and water\n\n## Filling\n\nMix sugar"
+        let viewModel = RecipeFormViewModel(mode: .add)
+        let groups = viewModel.parseInstructionsToGroups(input)
+
+        #expect(groups.count == 3)
+        #expect(groups[0].isUngrouped == true)
+        #expect(groups[0].text == "")
+        #expect(groups[1].title == "Dough")
+        #expect(groups[1].text == "Mix flour and water")
+        #expect(groups[2].title == "Filling")
+        #expect(groups[2].text == "Mix sugar")
+    }
+
+    @Test("Serializes instruction groups back to string")
+    func serializesInstructionGroups() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.instructionGroups = [
+            EditableInstructionGroup(title: "", text: "Preheat oven\nMix dough"),
+            EditableInstructionGroup(title: "Filling", text: "Mix sugar and cinnamon")
+        ]
+
+        let result = viewModel.serializeInstructionGroups()
+
+        #expect(result == "Preheat oven\nMix dough\n\n## Filling\n\nMix sugar and cinnamon")
+    }
+
+    @Test("Serialization round-trip preserves content")
+    func serializationRoundTrip() {
+        let original = "Preheat oven\nMix dough\n\n## Filling\n\nMix sugar and cinnamon\nSpread on dough"
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.instructionGroups = viewModel.parseInstructionsToGroups(original)
+
+        let result = viewModel.serializeInstructionGroups()
+
+        #expect(result == original)
+    }
+
+    @Test("Adds instruction group")
+    func addsInstructionGroup() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        let initialCount = viewModel.instructionGroups.count
+
+        let newId = viewModel.addInstructionGroup()
+
+        #expect(viewModel.instructionGroups.count == initialCount + 1)
+        #expect(viewModel.instructionGroups.last?.id == newId)
+        #expect(viewModel.instructionGroups.last?.title == "New Group")
+    }
+
+    @Test("Removes instruction group by ID")
+    func removesInstructionGroup() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        let groupId = viewModel.addInstructionGroup()
+        #expect(viewModel.instructionGroups.count == 2)
+
+        viewModel.removeInstructionGroup(id: groupId)
+
+        #expect(viewModel.instructionGroups.count == 1)
+    }
+
+    @Test("Cannot remove ungrouped instruction group")
+    func cannotRemoveUngroupedInstructionGroup() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.addInstructionGroup()
+        #expect(viewModel.instructionGroups.count == 2)
+
+        let ungroupedId = viewModel.instructionGroups[0].id
+        viewModel.removeInstructionGroup(id: ungroupedId)
+
+        #expect(viewModel.instructionGroups.count == 2)
+    }
+
+    @Test("Validates instruction group title cannot be empty")
+    func validatesInstructionGroupTitleRequired() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "Test Recipe"
+        viewModel.ingredients = [EditableIngredient(amount: "", name: "flour")]
+        viewModel.instructionGroups = [
+            EditableInstructionGroup(title: "", text: "Step one"),
+            EditableInstructionGroup(title: "", text: "Step two")  // empty title on named group
+        ]
+
+        let isValid = viewModel.validate()
+
+        #expect(isValid == false)
+        #expect(viewModel.instructionGroupTitleHasError == true)
+    }
+
+    @Test("Validates successfully with valid instruction group titles")
+    func validatesWithValidInstructionGroupTitles() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "Test Recipe"
+        viewModel.ingredients = [EditableIngredient(amount: "", name: "flour")]
+        viewModel.instructionGroups = [
+            EditableInstructionGroup(title: "", text: "Step one"),
+            EditableInstructionGroup(title: "Frosting", text: "Beat cream cheese")
+        ]
+
+        let isValid = viewModel.validate()
+
+        #expect(isValid == true)
+    }
+
+    @Test("Detects instruction group changes")
+    func detectsInstructionGroupChanges() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        #expect(viewModel.hasUnsavedChanges == false)
+
+        viewModel.addInstructionGroup()
+
+        #expect(viewModel.hasUnsavedChanges == true)
+    }
+
+    @Test("Populates instruction groups from existing recipe")
+    func populatesInstructionGroupsFromRecipe() {
+        let recipe = Recipe(
+            title: "Cinnamon Rolls",
+            ingredientGroups: [IngredientGroup(ingredients: [
+                Ingredient(name: "flour", amount: Amount(3, unit: "cups"))
+            ])],
+            instructions: "Make dough\nLet rise\n\n## Filling\n\nMix sugar and cinnamon"
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: URL(fileURLWithPath: "/tmp/test.md"),
+            recipe: recipe
+        )
+
+        let viewModel = RecipeFormViewModel(mode: .edit(recipeFile))
+
+        #expect(viewModel.instructionGroups.count == 2)
+        #expect(viewModel.instructionGroups[0].isUngrouped == true)
+        #expect(viewModel.instructionGroups[0].text == "Make dough\nLet rise")
+        #expect(viewModel.instructionGroups[1].title == "Filling")
+        #expect(viewModel.instructionGroups[1].text == "Mix sugar and cinnamon")
+    }
+
+    @Test("Initializes with single empty ungrouped instruction group in add mode")
+    func initializesWithSingleUngroupedInstructionGroup() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+
+        #expect(viewModel.instructionGroups.count == 1)
+        #expect(viewModel.instructionGroups[0].isUngrouped == true)
+        #expect(viewModel.instructionGroups[0].text == "")
     }
 }
