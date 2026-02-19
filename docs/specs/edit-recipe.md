@@ -38,6 +38,12 @@ Edit all aspects of an existing recipe, preserving RecipeMD format. Changes save
 - [ ] User can rename instruction group titles
 - [ ] Ungrouped instructions remain in a default section at the top
 - [ ] Instruction groups serialize to H2 headings within the freeform instructions string
+- [ ] User can toggle between structured form and raw markdown editor
+- [ ] Raw markdown mode displays the full RecipeMD file content in a single text editor
+- [ ] Switching from form to markdown serializes current form state into markdown
+- [ ] Switching from markdown to form parses markdown back into form fields
+- [ ] Parse errors when switching to form mode show an alert and keep the user in markdown mode
+- [ ] Save works in both form and markdown modes
 
 ## Technical Requirements
 
@@ -165,6 +171,33 @@ Instruction groups allow users to organize instructions under titled sections (e
   1. Combine cream cheese and sugar
   2. Beat until smooth
   ```
+
+### Raw Markdown Mode
+The form includes a toggle to switch between the structured form UI and a raw markdown editor. This lets power users view and edit the full RecipeMD source directly.
+
+**Toggle Placement**:
+- A toolbar button (e.g., `<>` or `chevron.left.forwardslash.chevron.right`) in the navigation bar toggles between modes
+- The button label indicates the current mode: "Markdown" when in form mode (to switch to markdown), "Form" when in markdown mode (to switch back)
+
+**Form → Markdown**:
+- When the user switches to markdown mode, the current form state is serialized into a full RecipeMD markdown string using the existing serializer
+- The markdown is displayed in a full-height `TextEditor` that replaces the tabbed form
+- The tab bar is hidden in markdown mode
+
+**Markdown → Form**:
+- When the user switches back to form mode, the raw markdown is parsed using the existing RecipeMD parser
+- If parsing succeeds, the form fields are repopulated from the parsed result
+- If parsing fails (invalid markdown structure), an alert is shown with the error message and the user stays in markdown mode to fix the issue
+- Unsaved edits in the markdown editor are preserved until the user successfully switches or discards
+
+**Saving in Markdown Mode**:
+- Save writes the raw markdown string directly to the file (no serialization step needed)
+- Validation in markdown mode only checks that the content is non-empty and starts with a valid H1 title line
+- The full form-level validation (required title, at least one ingredient) is skipped in markdown mode since the user has direct control over the content
+
+**Pre-population in Edit Mode**:
+- When editing an existing recipe, the raw markdown is loaded from the original file
+- If the user switches to markdown mode before making form changes, the original file content is shown (not a re-serialized version), preserving any formatting or comments the user may have added manually
 
 ### File Operations
 - Atomic write (write to temp file, then replace)
@@ -322,6 +355,42 @@ The segmented control is **not inside the scroll view** — it is pinned at the 
 - Each group has its own text editor area with a fixed height and expand button
 - "+ Add Instruction Group" appears at the bottom of the instructions section
 - The ungrouped section always appears first and cannot be deleted
+
+### Raw Markdown Mode
+
+```
+┌─────────────────────────────────────┐
+│ Cancel    Edit Recipe  [Form] Save  │
+├─────────────────────────────────────┤
+│                                     │
+│ # Chocolate Chip Cookies            │
+│                                     │
+│ Classic homemade cookies.           │
+│                                     │
+│ *dessert, baking*                   │
+│                                     │
+│ **makes 24 cookies**                │
+│                                     │
+│ ---                                 │
+│                                     │
+│ - *2 1/4 cups* all-purpose flour    │
+│ - *1 tsp* baking soda              │
+│ - *2 cups* chocolate chips          │
+│                                     │
+│ ---                                 │
+│                                     │
+│ 1. Preheat oven to 375°F           │
+│ 2. Mix flour and baking soda        │
+│ 3. Cream butter and sugars          │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+- The toolbar button reads "Form" (to switch back to form mode)
+- The entire view is a single scrollable `TextEditor` with the raw RecipeMD content
+- The tab bar (Details / Ingredients / Instructions) is hidden
+- Syntax is not highlighted (plain text editing)
+- In edit mode, the original file content is shown (preserving user formatting)
 
 ### Expandable Text Editors
 Multi-line text fields (description, all instruction text areas) use a **fixed-height preview with expand-to-fullscreen** pattern:
@@ -508,6 +577,47 @@ Multi-line text fields (description, all instruction text areas) use a **fixed-h
 4. Tap Save
 5. Verify .md file instructions start with ungrouped text, followed by `## Bake` heading and its text
 
+### TC-058: Switch to raw markdown mode during edit
+1. Open a recipe and tap Edit
+2. Verify the form is pre-populated with existing data
+3. Tap the Markdown toggle button in the toolbar
+4. Verify the tabbed form is replaced by a single text editor
+5. Verify the text editor contains the original file's markdown content
+6. Verify the toolbar button now reads "Form"
+
+### TC-059: Edit raw markdown and save
+1. Open a recipe, tap Edit, switch to markdown mode
+2. Modify the markdown (e.g., change the title from `# Pancakes` to `# Fluffy Pancakes`)
+3. Tap Save
+4. Verify the recipe is saved successfully
+5. Verify the .md file contains the updated title
+
+### TC-060: Switch from markdown back to form mode
+1. Open a recipe, tap Edit, switch to markdown mode
+2. Tap the Form toggle button
+3. Verify the form repopulates with parsed data (title, ingredients, instructions in correct tabs)
+4. Verify tab bar reappears
+
+### TC-061: Invalid markdown prevents switch to form
+1. Open a recipe, tap Edit, switch to markdown mode
+2. Delete the title line (remove the `# ...` heading)
+3. Tap the Form toggle button
+4. Verify an alert is shown indicating the markdown could not be parsed
+5. Verify the user stays in markdown mode with their text preserved
+
+### TC-062: Round-trip form → markdown → form preserves data
+1. Open a recipe and tap Edit
+2. Modify the title in form mode
+3. Switch to markdown mode — verify the new title appears in the markdown
+4. Switch back to form mode — verify the title field still has the modified value
+5. Verify all other fields (description, tags, yields, ingredients, instructions) are preserved
+
+### TC-063: Original file formatting preserved in markdown mode
+1. Manually add a comment or extra whitespace to a .md file
+2. Open that recipe in the app and tap Edit
+3. Switch to markdown mode without making form changes first
+4. Verify the original file content is shown exactly, including the manual formatting
+
 ## Accessibility Requirements
 - Same as Add Recipe form
 - Announce "Editing [Recipe Name]" when edit mode opens
@@ -516,7 +626,6 @@ Multi-line text fields (description, all instruction text areas) use a **fixed-h
 ## Open Questions
 - Should title change rename the file? Keep original filename
 - Show edit history/versions? (v2.0 with git integration)
-- Allow editing raw markdown? (Advanced mode for power users)
 - Should users be able to reorder ingredient groups via drag-and-drop? (v2.0)
 - Should users be able to move ingredients between groups? (v2.0)
 - Should users be able to reorder instruction groups via drag-and-drop? (v2.0)

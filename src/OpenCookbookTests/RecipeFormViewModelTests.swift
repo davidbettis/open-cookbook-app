@@ -946,4 +946,166 @@ struct RecipeFormViewModelTests {
         #expect(viewModel.instructionGroups[0].isUngrouped == true)
         #expect(viewModel.instructionGroups[0].text == "")
     }
+
+    // MARK: - Markdown Mode Tests
+
+    @Test("generateMarkdown serializes current form state")
+    func generateMarkdownSerializesFormState() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "Pancakes"
+        viewModel.ingredients = [EditableIngredient(amount: "2 cups", name: "flour")]
+
+        let markdown = viewModel.generateMarkdown()
+
+        #expect(markdown.contains("# Pancakes"))
+        #expect(markdown.contains("flour"))
+    }
+
+    @Test("enterMarkdownMode populates rawMarkdown")
+    func enterMarkdownModePopulatesRawMarkdown() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "Test Recipe"
+        viewModel.ingredients = [EditableIngredient(amount: "1 cup", name: "sugar")]
+
+        viewModel.enterMarkdownMode()
+
+        #expect(!viewModel.rawMarkdown.isEmpty)
+        #expect(viewModel.rawMarkdown.contains("# Test Recipe"))
+    }
+
+    @Test("exitMarkdownMode parses valid markdown and repopulates form fields")
+    func exitMarkdownModeRepopulatesFields() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "Old Title"
+        viewModel.ingredients = [EditableIngredient(amount: "1 cup", name: "flour")]
+
+        viewModel.enterMarkdownMode()
+        viewModel.rawMarkdown = """
+        # New Title
+
+        ---
+
+        - 2 cups sugar
+
+        ---
+
+        Mix well.
+        """
+
+        let error = viewModel.exitMarkdownMode()
+
+        #expect(error == nil)
+        #expect(viewModel.title == "New Title")
+    }
+
+    @Test("exitMarkdownMode returns error for invalid markdown")
+    func exitMarkdownModeReturnsErrorForInvalid() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.enterMarkdownMode()
+        viewModel.rawMarkdown = "This is not valid RecipeMD"
+
+        let error = viewModel.exitMarkdownMode()
+
+        #expect(error != nil)
+    }
+
+    @Test("validateMarkdown rejects empty content")
+    func validateMarkdownRejectsEmpty() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.rawMarkdown = ""
+
+        let isValid = viewModel.validateMarkdown()
+
+        #expect(isValid == false)
+        #expect(viewModel.validationErrors.contains { $0.field == "markdown" })
+    }
+
+    @Test("validateMarkdown rejects content without H1 heading")
+    func validateMarkdownRejectsNoHeading() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.rawMarkdown = "No heading here\n\n---\n\n- flour\n\n---\n\nInstructions"
+
+        let isValid = viewModel.validateMarkdown()
+
+        #expect(isValid == false)
+    }
+
+    @Test("validateMarkdown accepts valid RecipeMD content")
+    func validateMarkdownAcceptsValid() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.rawMarkdown = "# My Recipe\n\n---\n\n- flour\n\n---\n\nBake it."
+
+        let isValid = viewModel.validateMarkdown()
+
+        #expect(isValid == true)
+    }
+
+    @Test("hasUnsavedMarkdownChanges is false before entering markdown mode")
+    func hasUnsavedMarkdownChangesIsFalseInitially() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+
+        #expect(viewModel.hasUnsavedMarkdownChanges == false)
+    }
+
+    @Test("hasUnsavedMarkdownChanges detects edits after enterMarkdownMode")
+    func hasUnsavedMarkdownChangesDetectsEdits() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "Test"
+        viewModel.ingredients = [EditableIngredient(amount: "", name: "flour")]
+
+        viewModel.enterMarkdownMode()
+        #expect(viewModel.hasUnsavedMarkdownChanges == false)
+
+        viewModel.rawMarkdown += "\nSome extra content"
+        #expect(viewModel.hasUnsavedMarkdownChanges == true)
+    }
+
+    @Test("generateMarkdown shows original file content in edit mode with no form changes")
+    func generateMarkdownShowsOriginalFileInEditMode() throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let testFile = tempDir.appendingPathComponent("markdown-original-\(UUID().uuidString).md")
+
+        let originalContent = """
+        # My Custom Recipe
+
+        A description with *custom formatting*.
+
+        ---
+
+        - 1 cup flour
+        - 2 eggs
+
+        ---
+
+        Do the thing.
+        """
+        try originalContent.write(to: testFile, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: testFile) }
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: testFile.path)
+        let modDate = attributes[.modificationDate] as? Date
+
+        let recipe = Recipe(
+            title: "My Custom Recipe",
+            description: "A description with *custom formatting*.",
+            ingredientGroups: [IngredientGroup(ingredients: [
+                Ingredient(name: "flour", amount: Amount(1, unit: "cup")),
+                Ingredient(name: "eggs", amount: Amount(2, unit: nil))
+            ])],
+            instructions: "Do the thing."
+        )
+
+        let recipeFile = RecipeFile(
+            filePath: testFile,
+            recipe: recipe,
+            fileModifiedDate: modDate
+        )
+
+        let viewModel = RecipeFormViewModel(mode: .edit(recipeFile))
+
+        let markdown = viewModel.generateMarkdown()
+
+        // Should be the original file content, not re-serialized
+        #expect(markdown == originalContent)
+    }
 }

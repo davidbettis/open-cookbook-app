@@ -39,6 +39,12 @@ Create new recipes using a form-based UI that maps to RecipeMD format structure.
 - [ ] Validation for required fields (at minimum: title, ingredients)
 - [ ] Cancel button with unsaved changes confirmation
 - [ ] Success feedback when recipe saved
+- [ ] User can toggle between structured form and raw markdown editor
+- [ ] Raw markdown mode displays the full RecipeMD content in a single text editor
+- [ ] Switching from form to markdown serializes current form state into markdown
+- [ ] Switching from markdown to form parses markdown back into form fields
+- [ ] Parse errors when switching to form mode show an alert and keep the user in markdown mode
+- [ ] Save works in both form and markdown modes
 
 ## Technical Requirements
 
@@ -237,6 +243,41 @@ The segmented control is **not inside the scroll view** — it is pinned at the 
 └─────────────────────────────────────┘
 ```
 
+### Raw Markdown Mode
+
+```
+┌─────────────────────────────────────┐
+│ Cancel    Add Recipe   [Form] Save  │
+├─────────────────────────────────────┤
+│                                     │
+│ # Chocolate Cake                    │
+│                                     │
+│ A rich, moist chocolate layer cake. │
+│                                     │
+│ *dessert, baking*                   │
+│                                     │
+│ **serves 12**                       │
+│                                     │
+│ ---                                 │
+│                                     │
+│ - *2 cups* all-purpose flour        │
+│ - *1 cup* sugar                     │
+│ - *3/4 cup* cocoa powder            │
+│                                     │
+│ ---                                 │
+│                                     │
+│ 1. Preheat oven to 350°F           │
+│ 2. Mix dry ingredients              │
+│ 3. Add wet ingredients and combine  │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+- The toolbar button reads "Form" (to switch back to form mode)
+- The entire view is a single scrollable `TextEditor` with the raw RecipeMD content
+- The tab bar (Details / Ingredients / Instructions) is hidden
+- Syntax is not highlighted (plain text editing)
+
 ### Expandable Text Editors
 Multi-line text fields (description, all instruction text areas) use a **fixed-height preview with expand-to-fullscreen** pattern:
 - Text areas display at a compact fixed height (description: 3-4 lines, instructions: 4-6 lines)
@@ -320,6 +361,29 @@ Instruction groups allow users to organize instructions under titled sections (e
   1. Combine cream cheese and sugar
   2. Beat until smooth
   ```
+
+### Raw Markdown Mode
+The form includes a toggle to switch between the structured form UI and a raw markdown editor. This lets power users view and edit the full RecipeMD source directly.
+
+**Toggle Placement**:
+- A toolbar button (e.g., `<>` or `chevron.left.forwardslash.chevron.right`) in the navigation bar toggles between modes
+- The button label indicates the current mode: "Markdown" when in form mode (to switch to markdown), "Form" when in markdown mode (to switch back)
+
+**Form → Markdown**:
+- When the user switches to markdown mode, the current form state is serialized into a full RecipeMD markdown string using the existing serializer
+- The markdown is displayed in a full-height `TextEditor` that replaces the tabbed form
+- The tab bar is hidden in markdown mode
+
+**Markdown → Form**:
+- When the user switches back to form mode, the raw markdown is parsed using the existing RecipeMD parser
+- If parsing succeeds, the form fields are repopulated from the parsed result
+- If parsing fails (invalid markdown structure), an alert is shown with the error message and the user stays in markdown mode to fix the issue
+- Unsaved edits in the markdown editor are preserved until the user successfully switches or discards
+
+**Saving in Markdown Mode**:
+- Save writes the raw markdown string directly to the file (no serialization step needed)
+- Validation in markdown mode only checks that the content is non-empty and starts with a valid H1 title line
+- The full form-level validation (required title, at least one ingredient) is skipped in markdown mode since the user has direct control over the content
 
 ### Form Behavior
 - Auto-save draft to prevent data loss (optional for v1.0)
@@ -492,9 +556,43 @@ Instruction groups allow users to organize instructions under titled sections (e
 7. Verify recipe saves successfully
 8. Verify .md file instructions contain `## Steps` heading with its text
 
+### TC-058: Switch to raw markdown mode
+1. Tap + button to add recipe
+2. Enter title: "Test Recipe"
+3. Add an ingredient: "1 cup flour"
+4. Tap the Markdown toggle button in the toolbar
+5. Verify the tabbed form is replaced by a single text editor
+6. Verify the text editor contains valid RecipeMD with the title and ingredient
+7. Verify the toolbar button now reads "Form"
+
+### TC-059: Edit in raw markdown mode and save
+1. Switch to markdown mode
+2. Edit the raw markdown to add a new ingredient line: `- *2 cups* sugar`
+3. Tap Save
+4. Verify the recipe is saved successfully
+5. Verify the saved .md file contains the added ingredient
+
+### TC-060: Switch from markdown back to form mode
+1. Enter a complete recipe in markdown mode
+2. Tap the Form toggle button
+3. Verify the form repopulates with parsed data (title, ingredients, instructions in correct tabs)
+4. Verify tab bar reappears
+
+### TC-061: Invalid markdown prevents switch to form
+1. Switch to markdown mode
+2. Delete the title line (remove the `# ...` heading)
+3. Tap the Form toggle button
+4. Verify an alert is shown indicating the markdown could not be parsed
+5. Verify the user stays in markdown mode with their text preserved
+
+### TC-062: Round-trip form → markdown → form preserves data
+1. Enter title: "Round Trip Test", description, tags, ingredients, and instructions in form mode
+2. Switch to markdown mode
+3. Switch back to form mode
+4. Verify all fields (title, description, tags, yields, ingredients, instructions) match the original values
+
 ## Open Questions
 - Auto-save drafts? (Prevent data loss)
-- Markdown preview for instructions? (v2.0)
 - Import from clipboard? (Parse text and pre-fill form)
 - Photo upload? (RecipeMD supports markdown images)
 - Should users be able to reorder ingredient groups via drag-and-drop? (v2.0)

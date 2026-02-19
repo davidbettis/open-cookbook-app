@@ -213,6 +213,113 @@ class RecipeStore {
         recipeCache[fileURL] = CachedRecipeFile(recipeFile: updatedRecipeFile, modificationDate: Date())
     }
 
+    /// Save a new recipe from raw markdown content
+    /// - Parameters:
+    ///   - markdown: The raw markdown string to write
+    ///   - title: The recipe title (used for filename generation)
+    ///   - folder: The folder to save in
+    /// - Returns: The saved recipe file
+    /// - Throws: RecipeWriteError if save fails
+    func saveNewRecipeFromMarkdown(_ markdown: String, title: String, in folder: URL) async throws -> RecipeFile {
+        isSaving = true
+        defer { isSaving = false }
+
+        // Start accessing security-scoped resource
+        let didStartAccess = folder.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccess {
+                folder.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        // Generate unique filename
+        let fileURL: URL
+        do {
+            fileURL = try filenameGenerator.generateFileURL(for: title, in: folder)
+        } catch {
+            throw RecipeWriteError.invalidFilename
+        }
+
+        // Write raw markdown to file
+        do {
+            try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
+        } catch {
+            throw RecipeWriteError.writeError(underlying: error)
+        }
+
+        // Parse the written file to get a proper RecipeFile for the store
+        let savedRecipeFile: RecipeFile
+        do {
+            savedRecipeFile = try parser.parse(from: fileURL)
+        } catch {
+            throw RecipeWriteError.serializationError
+        }
+
+        // Add to recipes array and cache with animation
+        withAnimation {
+            recipes.append(savedRecipeFile)
+            recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        }
+        recipeCache[fileURL] = CachedRecipeFile(recipeFile: savedRecipeFile, modificationDate: Date())
+
+        return savedRecipeFile
+    }
+
+    /// Update an existing recipe from raw markdown content
+    /// - Parameters:
+    ///   - markdown: The raw markdown string to write
+    ///   - filePath: The file URL to overwrite
+    /// - Throws: RecipeWriteError if update fails
+    func updateRecipeFromMarkdown(_ markdown: String, filePath: URL) async throws {
+        isSaving = true
+        defer { isSaving = false }
+
+        let fileURL = filePath
+
+        // Start accessing security-scoped resource
+        let didStartAccess = fileURL.startAccessingSecurityScopedResource()
+        defer {
+            if didStartAccess {
+                fileURL.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        // Verify file exists
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            throw RecipeWriteError.writeError(underlying: NSError(
+                domain: "RecipeStore",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Original file not found"]
+            ))
+        }
+
+        // Write raw markdown to file
+        do {
+            try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
+        } catch {
+            throw RecipeWriteError.writeError(underlying: error)
+        }
+
+        // Re-parse to update the store's in-memory RecipeFile
+        let updatedRecipeFile: RecipeFile
+        do {
+            updatedRecipeFile = try parser.parse(from: fileURL)
+        } catch {
+            throw RecipeWriteError.serializationError
+        }
+
+        // Update recipes array with animation
+        withAnimation {
+            if let index = recipes.firstIndex(where: { $0.filePath == fileURL }) {
+                recipes[index] = updatedRecipeFile
+            }
+            recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        }
+
+        // Update cache
+        recipeCache[fileURL] = CachedRecipeFile(recipeFile: updatedRecipeFile, modificationDate: Date())
+    }
+
     /// Delete a recipe
     /// - Parameter recipeFile: The recipe file to delete
     /// - Throws: RecipeDeleteError if deletion fails

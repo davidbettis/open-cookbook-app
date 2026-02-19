@@ -24,6 +24,9 @@ struct RecipeFormView: View {
     let onSave: ((RecipeFile) -> Void)?
 
     @State private var selectedTab: FormTab = .details
+    @State private var isMarkdownMode = false
+    @State private var showMarkdownParseError = false
+    @State private var markdownParseErrorMessage = ""
     @State private var showCancelConfirmation = false
     @State private var showErrorAlert = false
     @State private var showConflictAlert = false
@@ -48,22 +51,28 @@ struct RecipeFormView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                Picker("Tab", selection: $selectedTab) {
-                    ForEach(FormTab.allCases, id: \.self) { tab in
-                        Text(tab.rawValue).tag(tab)
+                if isMarkdownMode {
+                    TextEditor(text: $viewModel.rawMarkdown)
+                        .font(.system(.body, design: .monospaced))
+                        .padding(.horizontal)
+                } else {
+                    Picker("Tab", selection: $selectedTab) {
+                        ForEach(FormTab.allCases, id: \.self) { tab in
+                            Text(tab.rawValue).tag(tab)
+                        }
                     }
-                }
-                .pickerStyle(.segmented)
-                .fixedSize()
-                .padding(.vertical, 8)
+                    .pickerStyle(.segmented)
+                    .fixedSize()
+                    .padding(.vertical, 8)
 
-                switch selectedTab {
-                case .details:
-                    Form { metadataSections }
-                case .ingredients:
-                    Form { ingredientsSections }
-                case .instructions:
-                    Form { instructionsSections }
+                    switch selectedTab {
+                    case .details:
+                        Form { metadataSections }
+                    case .ingredients:
+                        Form { ingredientsSections }
+                    case .instructions:
+                        Form { instructionsSections }
+                    }
                 }
             }
             .navigationTitle(viewModel.navigationTitle)
@@ -135,6 +144,11 @@ struct RecipeFormView: View {
             } message: {
                 Text("This recipe was changed outside the app (possibly on another device). Do you want to overwrite those changes with your version?")
             }
+            .alert("Cannot Switch to Form", isPresented: $showMarkdownParseError) {
+                Button("OK") {}
+            } message: {
+                Text(markdownParseErrorMessage)
+            }
         }
     }
 
@@ -144,6 +158,12 @@ struct RecipeFormView: View {
     private var formToolbar: some ToolbarContent {
         ToolbarItem(placement: .cancellationAction) {
             Button("Cancel") { handleCancel() }
+        }
+        ToolbarItem(placement: .primaryAction) {
+            Button(isMarkdownMode ? "Form" : "Markdown") {
+                handleModeToggle()
+            }
+            .disabled(viewModel.isSaving)
         }
         ToolbarItem(placement: .confirmationAction) {
             Button(viewModel.saveButtonText) {
@@ -393,10 +413,25 @@ struct RecipeFormView: View {
     // MARK: - Actions
 
     private func handleCancel() {
-        if viewModel.hasUnsavedChanges {
+        let hasChanges = isMarkdownMode ? viewModel.hasUnsavedMarkdownChanges : viewModel.hasUnsavedChanges
+        if hasChanges {
             showCancelConfirmation = true
         } else {
             dismiss()
+        }
+    }
+
+    private func handleModeToggle() {
+        if isMarkdownMode {
+            if let errorMessage = viewModel.exitMarkdownMode() {
+                markdownParseErrorMessage = errorMessage
+                showMarkdownParseError = true
+            } else {
+                isMarkdownMode = false
+            }
+        } else {
+            viewModel.enterMarkdownMode()
+            isMarkdownMode = true
         }
     }
 
@@ -445,19 +480,26 @@ struct RecipeFormView: View {
         }
 
         do {
-            let savedRecipeFile = try await viewModel.save(to: folder, using: recipeStore, forceOverwrite: forceOverwrite)
+            let savedRecipeFile: RecipeFile
+            if isMarkdownMode {
+                savedRecipeFile = try await viewModel.saveRawMarkdown(to: folder, using: recipeStore, forceOverwrite: forceOverwrite)
+            } else {
+                savedRecipeFile = try await viewModel.save(to: folder, using: recipeStore, forceOverwrite: forceOverwrite)
+            }
             onSave?(savedRecipeFile)
             dismiss()
         } catch RecipeWriteError.fileModifiedExternally {
             showConflictAlert = true
         } catch {
-            // Auto-switch to the first tab with validation errors
-            if viewModel.titleHasError {
-                selectedTab = .details
-            } else if viewModel.ingredientsHasError || viewModel.groupTitleHasError {
-                selectedTab = .ingredients
-            } else if viewModel.instructionGroupTitleHasError {
-                selectedTab = .instructions
+            // Auto-switch to the first tab with validation errors (only in form mode)
+            if !isMarkdownMode {
+                if viewModel.titleHasError {
+                    selectedTab = .details
+                } else if viewModel.ingredientsHasError || viewModel.groupTitleHasError {
+                    selectedTab = .ingredients
+                } else if viewModel.instructionGroupTitleHasError {
+                    selectedTab = .instructions
+                }
             }
             showErrorAlert = true
         }

@@ -211,6 +211,14 @@ class RecipeFormViewModel {
     var saveError: Error?
     var validationErrors: [RecipeValidationError] = []
 
+    // MARK: - Markdown Mode State
+
+    /// Raw markdown content when in markdown editing mode
+    var rawMarkdown: String = ""
+
+    /// Snapshot of markdown when entering markdown mode (for change detection)
+    private var initialMarkdown: String?
+
     /// Original recipe file for edit mode (to detect changes)
     private var originalRecipeFile: RecipeFile?
 
@@ -283,6 +291,136 @@ class RecipeFormViewModel {
     /// Check if any instruction group title has error
     var instructionGroupTitleHasError: Bool {
         validationErrors.contains { $0.field == "instructionGroupTitle" }
+    }
+
+    /// Check if markdown has unsaved changes
+    var hasUnsavedMarkdownChanges: Bool {
+        guard let initial = initialMarkdown else { return false }
+        return rawMarkdown != initial
+    }
+
+    // MARK: - Markdown Mode Methods
+
+    /// Generate the markdown representation of the current recipe.
+    /// In edit mode with no form changes, reads the original file from disk to preserve user formatting.
+    /// Otherwise, serializes the current form state.
+    func generateMarkdown() -> String {
+        // In edit mode with no form changes, read original file content
+        if case .edit(let originalFile) = mode, !hasUnsavedChanges {
+            let fileURL = originalFile.filePath
+            let didStartAccess = fileURL.startAccessingSecurityScopedResource()
+            defer {
+                if didStartAccess {
+                    fileURL.stopAccessingSecurityScopedResource()
+                }
+            }
+            if let content = try? String(contentsOf: fileURL, encoding: .utf8) {
+                return content
+            }
+        }
+
+        // Otherwise, serialize current form state
+        let recipeFile = buildRecipeFile()
+        return RecipeFileSerializer().serialize(recipeFile)
+    }
+
+    /// Enter markdown editing mode — populates rawMarkdown from current state
+    func enterMarkdownMode() {
+        rawMarkdown = generateMarkdown()
+        if initialMarkdown == nil {
+            initialMarkdown = rawMarkdown
+        }
+    }
+
+    /// Exit markdown mode by parsing rawMarkdown back into form fields.
+    /// - Returns: nil on success, or an error message string if parsing fails
+    func exitMarkdownMode() -> String? {
+        let parser = RecipeMDParser()
+        do {
+            let recipe = try parser.parse(rawMarkdown)
+            let tempFile = RecipeFile(
+                filePath: URL(fileURLWithPath: "/tmp/markdown-preview.md"),
+                recipe: recipe
+            )
+            populateFromRecipeFile(tempFile)
+            return nil
+        } catch {
+            return error.localizedDescription
+        }
+    }
+
+    /// Validate raw markdown content (lighter than full form validation)
+    @discardableResult
+    func validateMarkdown() -> Bool {
+        validationErrors = []
+        let trimmed = rawMarkdown.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if trimmed.isEmpty {
+            validationErrors.append(RecipeValidationError(
+                field: "markdown",
+                message: "Markdown content cannot be empty"
+            ))
+            return false
+        }
+
+        if !trimmed.hasPrefix("# ") {
+            validationErrors.append(RecipeValidationError(
+                field: "markdown",
+                message: "Recipe must start with a title (# Title)"
+            ))
+            return false
+        }
+
+        return true
+    }
+
+    /// Save the raw markdown content directly
+    /// - Parameters:
+    ///   - folder: The folder to save in (for new recipes)
+    ///   - store: The recipe store
+    ///   - forceOverwrite: If true, skip conflict check and overwrite
+    /// - Returns: The saved recipe file
+    func saveRawMarkdown(to folder: URL, using store: RecipeStore, forceOverwrite: Bool = false) async throws -> RecipeFile {
+        guard validateMarkdown() else {
+            throw RecipeWriteError.serializationError
+        }
+
+        // Check for external modifications in edit mode (unless force overwrite)
+        if !forceOverwrite && checkForExternalModification() {
+            throw RecipeWriteError.fileModifiedExternally
+        }
+
+        isSaving = true
+        saveError = nil
+        defer { isSaving = false }
+
+        // Parse markdown to get recipe (needed for title in add mode and store updates)
+        let parser = RecipeMDParser()
+        let recipe: Recipe
+        do {
+            recipe = try parser.parse(rawMarkdown)
+        } catch {
+            throw RecipeWriteError.serializationError
+        }
+
+        do {
+            let savedRecipeFile: RecipeFile
+            switch mode {
+            case .add:
+                savedRecipeFile = try await store.saveNewRecipeFromMarkdown(rawMarkdown, title: recipe.title, in: folder)
+            case .edit(let originalFile):
+                try await store.updateRecipeFromMarkdown(rawMarkdown, filePath: originalFile.filePath)
+                savedRecipeFile = RecipeFile(
+                    filePath: originalFile.filePath,
+                    recipe: recipe,
+                    fileModifiedDate: Date()
+                )
+            }
+            return savedRecipeFile
+        } catch {
+            saveError = error
+            throw error
+        }
     }
 
     // MARK: - Public Methods
@@ -482,7 +620,7 @@ class RecipeFormViewModel {
     // MARK: - Private Methods
 
     /// Populate form fields from an existing recipe file
-    private func populateFromRecipeFile(_ recipeFile: RecipeFile) {
+    func populateFromRecipeFile(_ recipeFile: RecipeFile) {
         let recipe = recipeFile.recipe
 
         title = recipe.title
@@ -585,7 +723,7 @@ class RecipeFormViewModel {
     }
 
     /// Build a RecipeFile from the current form state
-    private func buildRecipeFile() -> RecipeFile {
+    func buildRecipeFile() -> RecipeFile {
         // Parse tags from comma-separated string
         let tags = tagsText
             .split(separator: ",")
