@@ -99,7 +99,7 @@ struct RecipeDetailView: View {
                 }
             }
         }
-        .sheet(item: $recipeToEdit) { fullRecipeFile in
+        .fullScreenCover(item: $recipeToEdit) { fullRecipeFile in
             if let store = recipeStore {
                 RecipeFormView(
                     viewModel: RecipeFormViewModel(mode: .edit(fullRecipeFile)),

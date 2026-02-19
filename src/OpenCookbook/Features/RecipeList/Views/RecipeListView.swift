@@ -115,7 +115,7 @@ struct RecipeListView: View {
             .navigationDestination(for: RecipeFile.self) { recipeFile in
                 RecipeDetailView(recipeFile: recipeFile, recipeStore: viewModel.recipeStore)
             }
-            .sheet(isPresented: $showAddRecipe) {
+            .fullScreenCover(isPresented: $showAddRecipe) {
                 RecipeFormView(
                     viewModel: RecipeFormViewModel(mode: .add),
                     recipeStore: viewModel.recipeStore,

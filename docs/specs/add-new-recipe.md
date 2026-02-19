@@ -121,82 +121,134 @@ Ingredient groups allow users to organize ingredients under titled sections (e.g
 
 ## UI/UX Requirements
 
-### Form Layout
+### Modal Presentation
+- The add recipe form is presented as a **full-screen modal** using `.fullScreenCover` (or `.sheet` with `.presentationDetents([.large])` and `.interactiveDismissDisabled()`)
+- This gives the form maximum vertical space, reducing scrolling and improving usability on smaller devices
+- The modal includes its own `NavigationStack` with Cancel/Save toolbar buttons
+
+### Tabbed Form Layout
+The form is divided into **three tabs** using a segmented control (`Picker` with `.segmented` style) pinned below the navigation bar. Each tab is its own independently scrollable page. This eliminates nested scroll conflicts between the outer form and inner text editors.
+
+**Tabs**:
+1. **Details** — Title, description, tags, yields
+2. **Ingredients** — Ungrouped ingredients and ingredient groups
+3. **Instructions** — Ungrouped instructions and instruction groups
+
+The segmented control is **not inside the scroll view** — it is pinned at the top so it remains visible while scrolling within a tab. Tab selection state is preserved when switching between tabs (no data loss).
+
 ```
-┌─────────────────────────────┐
-│ Cancel                 Save │
-├─────────────────────────────┤
-│ Title *                     │
-│ ┌─────────────────────────┐ │
-│ │ Recipe Name             │ │
-│ └─────────────────────────┘ │
-│                             │
-│ Description                 │
-│ ┌─────────────────────────┐ │
-│ │ Brief description...    │ │
-│ └─────────────────────────┘ │
-│                             │
-│ Tags                        │
-│ ┌─────────────────────────┐ │
-│ │ dessert, quick, easy    │ │
-│ └─────────────────────────┘ │
-│                             │
-│ Yields                      │
-│ ┌─────────────────────────┐ │
-│ │ serves 4, makes 12      │ │
-│ └─────────────────────────┘ │
-│                             │
-│ Ingredients *               │
-│ ┌───────────┬─────────────┐ │
-│ │ 2 cups    │ flour       │ │ ← Ungrouped ingredients
-│ └───────────┴─────────────┘ │
-│ ┌───────────┬─────────────┐ │
-│ │ 1 tsp     │ salt        │ │
-│ └───────────┴─────────────┘ │
-│ + Add Ingredient            │
-│                             │
-│ ┌─────────────────────── ✕ ┐│
-│ │ For the Filling          ││ ← Group header (editable title + delete)
-│ └──────────────────────────┘│
-│ ┌───────────┬─────────────┐ │
-│ │ 1 cup     │ cream cheese│ │ ← Group ingredients
-│ └───────────┴─────────────┘ │
-│ ┌───────────┬─────────────┐ │
-│ │ 1/2 cup   │ sugar       │ │
-│ └───────────┴─────────────┘ │
-│ + Add Ingredient            │ ← Per-group add button
-│                             │
-│ + Add Ingredient Group      │ ← Adds a new named group
-│                             │
-│ Instructions                │
-│ ┌─────────────────────────┐ │
-│ │ Preheat oven to 350°F.  │ │ ← Ungrouped instructions
-│ │                         │ │
-│ └─────────────────────────┘ │
-│                             │
-│ ┌─────────────────────── ✕ ┐│
-│ │ Make the Dough           ││ ← Group header (editable title + delete)
-│ └──────────────────────────┘│
-│ ┌─────────────────────────┐ │
-│ │ 1. Mix flour and salt   │ │ ← Group instructions (text editor)
-│ │ 2. Add butter and knead │ │
-│ └─────────────────────────┘ │
-│                             │
-│ ┌─────────────────────── ✕ ┐│
-│ │ Prepare the Filling      ││
-│ └──────────────────────────┘│
-│ ┌─────────────────────────┐ │
-│ │ 1. Combine cream cheese │ │
-│ │ 2. Beat until smooth    │ │
-│ └─────────────────────────┘ │
-│                             │
-│ + Add Instruction Group     │ ← Adds a new named group
-└─────────────────────────────┘
+┌─────────────────────────────────────┐
+│ Cancel    Add Recipe          Save  │
+├─────────────────────────────────────┤
+│ ┌──────────┬─────────────┬────────┐ │
+│ │ Details  │ Ingredients │ Instruc│ │ ← Segmented control (pinned)
+│ └──────────┴─────────────┴────────┘ │
+├─────────────────────────────────────┤
+│                                     │
+│   (Tab content scrolls here)        │
+│                                     │
+└─────────────────────────────────────┘
 ```
+
+### Details Tab
+
+```
+┌─────────────────────────────────────┐
+│ Title *                             │
+│ ┌─────────────────────────────────┐ │
+│ │ Recipe Name                     │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ Description                         │
+│ ┌─────────────────────────────────┐ │
+│ │ Brief description...      [↗]  │ │ ← Fixed height (3-4 lines)
+│ │                                 │ │   Tap [↗] to expand full-screen
+│ └─────────────────────────────────┘ │
+│                                     │
+│ Tags                                │
+│ ┌─────────────────────────────────┐ │
+│ │ dessert, quick, vegetarian      │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ Yields                              │
+│ ┌─────────────────────────────────┐ │
+│ │ serves 4, makes 12 cookies     │ │
+│ └─────────────────────────────────┘ │
+└─────────────────────────────────────┘
+```
+
+### Ingredients Tab
+
+```
+┌─────────────────────────────────────┐
+│ Ingredients *                       │
+│                                     │
+│ ┌───────────┬─────────────┐ ⊖      │
+│ │ 2 cups    │ flour       │        │ ← Ungrouped ingredients
+│ └───────────┴─────────────┘        │
+│ ┌───────────┬─────────────┐ ⊖      │
+│ │ 1 tsp     │ salt        │        │
+│ └───────────┴─────────────┘        │
+│ + Add Ingredient                    │
+│                                     │
+│ ┌───────────────────────────── ✕ ─┐ │
+│ │ For the Filling              │ │ ← Group header (editable title + delete)
+│ └─────────────────────────────────┘ │
+│ ┌───────────┬─────────────┐ ⊖      │
+│ │ 1 cup     │ cream cheese│        │ ← Group ingredients
+│ └───────────┴─────────────┘        │
+│ ┌───────────┬─────────────┐ ⊖      │
+│ │ 1/2 cup   │ sugar       │        │
+│ └───────────┴─────────────┘        │
+│ + Add Ingredient                    │ ← Per-group add button
+│                                     │
+│ + Add Ingredient Group              │ ← Adds a new named group
+└─────────────────────────────────────┘
+```
+
+### Instructions Tab
+
+```
+┌─────────────────────────────────────┐
+│ Instructions                        │
+│                                     │
+│ ┌─────────────────────────────────┐ │
+│ │ Preheat oven to 350°F.   [↗]  │ │ ← Fixed height (4-6 lines)
+│ │                                 │ │   Tap [↗] to expand full-screen
+│ └─────────────────────────────────┘ │
+│                                     │
+│ ┌───────────────────────────── ✕ ─┐ │
+│ │ Make the Dough                  │ │ ← Group header (editable title + delete)
+│ └─────────────────────────────────┘ │
+│ ┌─────────────────────────────────┐ │
+│ │ 1. Mix flour and salt     [↗]  │ │ ← Fixed height with expand button
+│ │ 2. Add butter and knead        │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ ┌───────────────────────────── ✕ ─┐ │
+│ │ Prepare the Filling             │ │
+│ └─────────────────────────────────┘ │
+│ ┌─────────────────────────────────┐ │
+│ │ 1. Combine cream cheese   [↗]  │ │
+│ │ 2. Beat until smooth            │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ + Add Instruction Group             │ ← Adds a new named group
+└─────────────────────────────────────┘
+```
+
+### Expandable Text Editors
+Multi-line text fields (description, all instruction text areas) use a **fixed-height preview with expand-to-fullscreen** pattern:
+- Text areas display at a compact fixed height (description: 3-4 lines, instructions: 4-6 lines)
+- An expand button (`[↗]` / `arrow.up.left.and.arrow.down.right`) appears in the corner of each text area
+- Tapping the expand button opens a **full-screen sheet** dedicated to editing that single text field
+- The full-screen editor includes a "Done" button to dismiss and return to the form
+- This eliminates nested scrolling — the outer form scrolls, but text areas never independently scroll
+- Text content syncs immediately between the compact and full-screen views (shared binding)
 
 ### Field Specifications
 - **Title**: Single-line text field, required indicator (*)
-- **Description**: Multi-line text field (3-4 lines), optional
+- **Description**: Multi-line text field, fixed height (3-4 lines) with expand button, optional
 - **Tags**: Single-line, comma-separated, placeholder: "dessert, quick, vegetarian"
 - **Yields**: Single-line, comma-separated, placeholder: "serves 4, makes 12 cookies"
 - **Ingredients**: Dynamic list
@@ -210,7 +262,7 @@ Ingredient groups allow users to organize ingredients under titled sections (e.g
   - Each group has its own ingredient list and "+ Add Ingredient" button
   - "+ Add Ingredient Group" button at the bottom of the entire ingredients section
   - Groups are visually separated from ungrouped ingredients
-- **Instructions**: Structured instruction groups UI (see below)
+- **Instructions**: Fixed height (4-6 lines) text areas with expand button, structured into instruction groups
 
 ### Instruction Groups
 **Tracking**: [GitHub Issue #4](https://github.com/davidbettis/open-cookbook-app/issues/4)

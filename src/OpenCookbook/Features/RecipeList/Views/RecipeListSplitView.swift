@@ -90,7 +90,7 @@ struct RecipeListSplitView: View {
             }
         }
         .navigationSplitViewStyle(.prominentDetail)
-        .sheet(isPresented: $showAddRecipe) {
+        .fullScreenCover(isPresented: $showAddRecipe) {
             RecipeFormView(
                 viewModel: RecipeFormViewModel(mode: .add),
                 recipeStore: viewModel.recipeStore,

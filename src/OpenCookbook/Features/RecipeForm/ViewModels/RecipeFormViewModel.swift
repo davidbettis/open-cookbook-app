@@ -78,9 +78,41 @@ struct EditableIngredient: Identifiable {
         return nil
     }
 
-    /// Parse a quantity string (handles fractions)
+    /// Unicode fraction lookup table
+    private static let unicodeFractions: [Character: Double] = [
+        "½": 0.5,
+        "⅓": 1.0 / 3.0,
+        "⅔": 2.0 / 3.0,
+        "¼": 0.25,
+        "¾": 0.75,
+        "⅕": 0.2,
+        "⅖": 0.4,
+        "⅗": 0.6,
+        "⅘": 0.8,
+        "⅙": 1.0 / 6.0,
+        "⅚": 5.0 / 6.0,
+        "⅛": 0.125,
+        "⅜": 0.375,
+        "⅝": 0.625,
+        "⅞": 0.875,
+    ]
+
+    /// Parse a quantity string (handles fractions and unicode fractions)
     private func parseQuantity(_ str: String) -> Double? {
-        // Handle fractions like "1/2"
+        // Handle single unicode fraction like "½"
+        if str.count == 1, let value = Self.unicodeFractions[str.first!] {
+            return value
+        }
+
+        // Handle mixed number with unicode fraction like "1½"
+        if let last = str.last, let fractionValue = Self.unicodeFractions[last] {
+            let wholeStr = String(str.dropLast())
+            if let whole = Double(wholeStr) {
+                return whole + fractionValue
+            }
+        }
+
+        // Handle ASCII fractions like "1/2"
         if str.contains("/") {
             let fractionParts = str.split(separator: "/")
             if fractionParts.count == 2,
@@ -90,7 +122,7 @@ struct EditableIngredient: Identifiable {
                 return numerator / denominator
             }
         }
-        // Handle mixed numbers like "1 1/2" - already split, so just parse
+        // Handle integers and decimals
         return Double(str)
     }
 

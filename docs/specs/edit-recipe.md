@@ -182,11 +182,40 @@ Instruction groups allow users to organize instructions under titled sections (e
 
 ## UI/UX Requirements
 
+### Modal Presentation
+- The edit form is presented as a **full-screen modal** using `.fullScreenCover` (or `.sheet` with `.presentationDetents([.large])` and `.interactiveDismissDisabled()`)
+- This gives the form maximum vertical space, reducing scrolling and improving usability on smaller devices
+- The modal includes its own `NavigationStack` with Cancel/Save toolbar buttons
+
 ### Navigation
 - Detail view has "Edit" button in navigation bar
-- Tap Edit → transition to edit form (slide or modal)
+- Tap Edit → transition to full-screen edit form
 - Cancel button → return to detail view
 - Save button → save changes and return to detail view
+
+### Tabbed Form Layout
+The form is divided into **three tabs** using a segmented control (`Picker` with `.segmented` style) pinned below the navigation bar. Each tab is its own independently scrollable page. This eliminates nested scroll conflicts between the outer form and inner text editors.
+
+**Tabs**:
+1. **Details** — Title, description, tags, yields
+2. **Ingredients** — Ungrouped ingredients and ingredient groups
+3. **Instructions** — Ungrouped instructions and instruction groups
+
+The segmented control is **not inside the scroll view** — it is pinned at the top so it remains visible while scrolling within a tab. Tab selection state is preserved when switching between tabs (no data loss).
+
+```
+┌─────────────────────────────────────┐
+│ Cancel    Edit Recipe         Save  │
+├─────────────────────────────────────┤
+│ ┌──────────┬─────────────┬────────┐ │
+│ │ Details  │ Ingredients │ Instruc│ │ ← Segmented control (pinned)
+│ └──────────┴─────────────┴────────┘ │
+├─────────────────────────────────────┤
+│                                     │
+│   (Tab content scrolls here)        │
+│                                     │
+└─────────────────────────────────────┘
+```
 
 ### Form Pre-population
 - Parse existing recipe into form fields
@@ -196,7 +225,34 @@ Instruction groups allow users to organize instructions under titled sections (e
 - Instructions parsed for headings and loaded into instruction group sections
 - If instructions contain no headings, all text appears in the ungrouped section
 
-### Ingredient Groups UI
+### Details Tab
+
+```
+┌─────────────────────────────────────┐
+│ Title *                             │
+│ ┌─────────────────────────────────┐ │
+│ │ Recipe Name                     │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ Description                         │
+│ ┌─────────────────────────────────┐ │
+│ │ Brief description...      [↗]  │ │ ← Fixed height (3-4 lines)
+│ │                                 │ │   Tap [↗] to expand full-screen
+│ └─────────────────────────────────┘ │
+│                                     │
+│ Tags                                │
+│ ┌─────────────────────────────────┐ │
+│ │ dessert, quick, vegetarian      │ │
+│ └─────────────────────────────────┘ │
+│                                     │
+│ Yields                              │
+│ ┌─────────────────────────────────┐ │
+│ │ serves 4, makes 12 cookies     │ │
+│ └─────────────────────────────────┘ │
+└─────────────────────────────────────┘
+```
+
+### Ingredients Tab
 
 ```
 ┌─────────────────────────────────────┐
@@ -230,22 +286,22 @@ Instruction groups allow users to organize instructions under titled sections (e
 - Each group has its own "+ Add Ingredient" button
 - "+ Add Ingredient Group" appears at the bottom of the entire ingredients section
 
-### Instruction Groups UI
+### Instructions Tab
 
 ```
 ┌─────────────────────────────────────┐
 │ Instructions                        │
 │                                     │
 │ ┌─────────────────────────────────┐ │
-│ │ Preheat oven to 350°F.         │ │ ← Ungrouped instructions
-│ │                                 │ │
+│ │ Preheat oven to 350°F.   [↗]  │ │ ← Fixed height (4-6 lines)
+│ │                                 │ │   Tap [↗] to expand full-screen
 │ └─────────────────────────────────┘ │
 │                                     │
 │ ┌───────────────────────────── ✕ ─┐ │
 │ │ Make the Dough                  │ │ ← Group header (editable title + delete)
 │ └─────────────────────────────────┘ │
 │ ┌─────────────────────────────────┐ │
-│ │ 1. Mix flour and salt           │ │ ← Group instructions (text editor)
+│ │ 1. Mix flour and salt     [↗]  │ │ ← Fixed height with expand button
 │ │ 2. Add butter and knead        │ │
 │ └─────────────────────────────────┘ │
 │                                     │
@@ -253,7 +309,7 @@ Instruction groups allow users to organize instructions under titled sections (e
 │ │ Prepare the Filling             │ │
 │ └─────────────────────────────────┘ │
 │ ┌─────────────────────────────────┐ │
-│ │ 1. Combine cream cheese         │ │
+│ │ 1. Combine cream cheese   [↗]  │ │
 │ │ 2. Beat until smooth            │ │
 │ └─────────────────────────────────┘ │
 │                                     │
@@ -263,9 +319,18 @@ Instruction groups allow users to organize instructions under titled sections (e
 
 - Each instruction group is visually separated with a header row containing the editable title
 - The group delete button (✕) is in the header row
-- Each group has its own text editor area
+- Each group has its own text editor area with a fixed height and expand button
 - "+ Add Instruction Group" appears at the bottom of the instructions section
 - The ungrouped section always appears first and cannot be deleted
+
+### Expandable Text Editors
+Multi-line text fields (description, all instruction text areas) use a **fixed-height preview with expand-to-fullscreen** pattern:
+- Text areas display at a compact fixed height (description: 3-4 lines, instructions: 4-6 lines)
+- An expand button (`[↗]` / `arrow.up.left.and.arrow.down.right`) appears in the corner of each text area
+- Tapping the expand button opens a **full-screen sheet** dedicated to editing that single text field
+- The full-screen editor includes a "Done" button to dismiss and return to the form
+- This eliminates nested scrolling — the outer form scrolls, but text areas never independently scroll
+- Text content syncs immediately between the compact and full-screen views (shared binding)
 
 ### Visual Feedback
 - Show loading indicator while parsing

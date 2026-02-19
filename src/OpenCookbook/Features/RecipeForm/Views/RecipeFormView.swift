@@ -8,6 +8,12 @@
 import SwiftUI
 import RecipeMD
 
+enum FormTab: String, CaseIterable {
+    case details = "Details"
+    case ingredients = "Ingredients"
+    case instructions = "Instructions"
+}
+
 /// Form view for creating or editing recipes
 struct RecipeFormView: View {
     @Environment(\.dismiss) private var dismiss
@@ -17,6 +23,7 @@ struct RecipeFormView: View {
     let recipeStore: RecipeStore
     let onSave: ((RecipeFile) -> Void)?
 
+    @State private var selectedTab: FormTab = .details
     @State private var showCancelConfirmation = false
     @State private var showErrorAlert = false
     @State private var showConflictAlert = false
@@ -40,10 +47,24 @@ struct RecipeFormView: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                metadataSections
-                ingredientsSections
-                instructionsSections
+            VStack(spacing: 0) {
+                Picker("Tab", selection: $selectedTab) {
+                    ForEach(FormTab.allCases, id: \.self) { tab in
+                        Text(tab.rawValue).tag(tab)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .fixedSize()
+                .padding(.vertical, 8)
+
+                switch selectedTab {
+                case .details:
+                    Form { metadataSections }
+                case .ingredients:
+                    Form { ingredientsSections }
+                case .instructions:
+                    Form { instructionsSections }
+                }
             }
             .navigationTitle(viewModel.navigationTitle)
             .navigationBarTitleDisplayMode(.inline)
@@ -155,8 +176,7 @@ struct RecipeFormView: View {
         }
 
         Section("Description") {
-            TextEditor(text: $viewModel.descriptionText)
-                .frame(minHeight: 80)
+            ExpandableTextEditor(text: $viewModel.descriptionText, title: "Description", fixedHeight: 80)
                 .accessibilityLabel("Recipe description")
                 .accessibilityHint("Optional brief description of the recipe")
         }
@@ -301,8 +321,7 @@ struct RecipeFormView: View {
 
         // Ungrouped instructions (always first)
         Section("Instructions") {
-            TextEditor(text: $viewModel.instructionGroups[0].text)
-                .frame(minHeight: 200)
+            ExpandableTextEditor(text: $viewModel.instructionGroups[0].text, title: "Instructions", fixedHeight: 150)
                 .accessibilityLabel("Recipe instructions")
                 .accessibilityHint("Enter step-by-step cooking instructions")
         }
@@ -312,8 +331,7 @@ struct RecipeFormView: View {
         ForEach($viewModel.instructionGroups) { $group in
             if group.id != ungroupedId {
                 Section {
-                    TextEditor(text: $group.text)
-                        .frame(minHeight: 150)
+                    ExpandableTextEditor(text: $group.text, title: group.title.isEmpty ? "Instructions" : group.title, fixedHeight: 150)
                         .accessibilityLabel("Instructions for \(group.title)")
                 } header: {
                     HStack {
@@ -433,6 +451,14 @@ struct RecipeFormView: View {
         } catch RecipeWriteError.fileModifiedExternally {
             showConflictAlert = true
         } catch {
+            // Auto-switch to the first tab with validation errors
+            if viewModel.titleHasError {
+                selectedTab = .details
+            } else if viewModel.ingredientsHasError || viewModel.groupTitleHasError {
+                selectedTab = .ingredients
+            } else if viewModel.instructionGroupTitleHasError {
+                selectedTab = .instructions
+            }
             showErrorAlert = true
         }
     }

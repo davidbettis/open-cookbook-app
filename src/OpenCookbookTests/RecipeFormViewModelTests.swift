@@ -268,6 +268,55 @@ struct RecipeFormViewModelTests {
         #expect(ingredient.name == "romano cheese")
     }
 
+    @Test("Unicode fraction amount parses correctly")
+    func unicodeFractionAmountParsesCorrectly() {
+        let editable = EditableIngredient(amount: "½ teaspoon", name: "cornstarch")
+        let ingredient = editable.toIngredient()
+
+        #expect(ingredient.name == "cornstarch")
+        #expect(ingredient.amount != nil)
+        #expect(ingredient.amount?.amount == 0.5)
+        #expect(ingredient.amount?.unit == "teaspoon")
+    }
+
+    @Test("Mixed number with unicode fraction parses correctly")
+    func mixedNumberWithUnicodeFractionParsesCorrectly() {
+        let editable = EditableIngredient(amount: "1½ cups", name: "flour")
+        let ingredient = editable.toIngredient()
+
+        #expect(ingredient.name == "flour")
+        #expect(ingredient.amount != nil)
+        #expect(ingredient.amount?.amount == 1.5)
+        #expect(ingredient.amount?.unit == "cups")
+    }
+
+    @Test("Single unicode fraction without unit parses correctly")
+    func singleUnicodeFractionWithoutUnitParsesCorrectly() {
+        let editable = EditableIngredient(amount: "¾", name: "lemon, juiced")
+        let ingredient = editable.toIngredient()
+
+        #expect(ingredient.name == "lemon, juiced")
+        #expect(ingredient.amount != nil)
+        #expect(ingredient.amount?.amount == 0.75)
+        #expect(ingredient.amount?.unit == nil)
+    }
+
+    @Test("Round-trip preserves unicode fraction ingredient")
+    func roundTripPreservesUnicodeFractionIngredient() {
+        let original = Ingredient(
+            name: "cornstarch",
+            amount: Amount(amount: 0.5, unit: "teaspoon", rawText: "½")
+        )
+
+        let editable = EditableIngredient(from: original)
+        let result = editable.toIngredient()
+
+        #expect(result.name == "cornstarch")
+        #expect(result.amount != nil)
+        #expect(result.amount?.amount == 0.5)
+        #expect(result.amount?.unit == "teaspoon")
+    }
+
     @Test("Validates editable ingredient")
     func validatesEditableIngredient() {
         let valid = EditableIngredient(amount: "1 cup", name: "flour")
