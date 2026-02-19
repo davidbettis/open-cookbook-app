@@ -176,8 +176,8 @@ Instruction groups allow users to organize instructions under titled sections (e
 The form includes a toggle to switch between the structured form UI and a raw markdown editor. This lets power users view and edit the full RecipeMD source directly.
 
 **Toggle Placement**:
-- A toolbar button (e.g., `<>` or `chevron.left.forwardslash.chevron.right`) in the navigation bar toggles between modes
-- The button label indicates the current mode: "Markdown" when in form mode (to switch to markdown), "Form" when in markdown mode (to switch back)
+- The mode toggle is placed inside a `...` overflow menu (`ellipsis.circle`) in the navigation bar toolbar, keeping it accessible but out of the way for casual users
+- Menu item: "Edit as Markdown" (with `chevron.left.forwardslash.chevron.right` icon) when in form mode, "Switch to Form" (with `list.bullet.rectangle` icon) when in markdown mode
 
 **Form → Markdown**:
 - When the user switches to markdown mode, the current form state is serialized into a full RecipeMD markdown string using the existing serializer
@@ -360,7 +360,7 @@ The segmented control is **not inside the scroll view** — it is pinned at the 
 
 ```
 ┌─────────────────────────────────────┐
-│ Cancel    Edit Recipe  [Form] Save  │
+│ Cancel    Edit Recipe    Save  [...] │
 ├─────────────────────────────────────┤
 │                                     │
 │ # Chocolate Chip Cookies            │
@@ -386,7 +386,7 @@ The segmented control is **not inside the scroll view** — it is pinned at the 
 └─────────────────────────────────────┘
 ```
 
-- The toolbar button reads "Form" (to switch back to form mode)
+- The `...` menu item reads "Switch to Form" (to switch back to form mode)
 - The entire view is a single scrollable `TextEditor` with the raw RecipeMD content
 - The tab bar (Details / Ingredients / Instructions) is hidden
 - Syntax is not highlighted (plain text editing)
@@ -580,10 +580,10 @@ Multi-line text fields (description, all instruction text areas) use a **fixed-h
 ### TC-058: Switch to raw markdown mode during edit
 1. Open a recipe and tap Edit
 2. Verify the form is pre-populated with existing data
-3. Tap the Markdown toggle button in the toolbar
+3. Tap the `...` menu and select "Edit as Markdown"
 4. Verify the tabbed form is replaced by a single text editor
 5. Verify the text editor contains the original file's markdown content
-6. Verify the toolbar button now reads "Form"
+6. Verify the `...` menu now shows "Switch to Form"
 
 ### TC-059: Edit raw markdown and save
 1. Open a recipe, tap Edit, switch to markdown mode
@@ -594,7 +594,7 @@ Multi-line text fields (description, all instruction text areas) use a **fixed-h
 
 ### TC-060: Switch from markdown back to form mode
 1. Open a recipe, tap Edit, switch to markdown mode
-2. Tap the Form toggle button
+2. Tap the `...` menu and select "Switch to Form"
 3. Verify the form repopulates with parsed data (title, ingredients, instructions in correct tabs)
 4. Verify tab bar reappears
 

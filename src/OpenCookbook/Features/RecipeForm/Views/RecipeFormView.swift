@@ -159,15 +159,24 @@ struct RecipeFormView: View {
         ToolbarItem(placement: .cancellationAction) {
             Button("Cancel") { handleCancel() }
         }
-        ToolbarItem(placement: .primaryAction) {
-            Button(isMarkdownMode ? "Form" : "Markdown") {
-                handleModeToggle()
+        ToolbarItem(placement: .confirmationAction) {
+            Button(viewModel.saveButtonText) {
+                Task { await handleSave(forceOverwrite: false) }
             }
             .disabled(viewModel.isSaving)
         }
         ToolbarItem(placement: .confirmationAction) {
-            Button(viewModel.saveButtonText) {
-                Task { await handleSave(forceOverwrite: false) }
+            Menu {
+                Button {
+                    handleModeToggle()
+                } label: {
+                    Label(
+                        isMarkdownMode ? "Switch to Form" : "Edit as Markdown",
+                        systemImage: isMarkdownMode ? "list.bullet.rectangle" : "chevron.left.forwardslash.chevron.right"
+                    )
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
             }
             .disabled(viewModel.isSaving)
         }
