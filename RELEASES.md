@@ -1,6 +1,11 @@
 # Release History
 
-1.0.1 - minor new features
+1.0.2
+- Add the ability to import a recipe from a website
+- Leverages Claude API (API key needed) to do the extraction
+- Uses Claude web helper tool to fetch the website
+
+1.0.1
 - Add ingredient groups (e.g. one group for a sauce, another group for the core of the dish)
 - Add instruction groups (parallel to ingredient groups, but for instructions)
 - Add support to view/edit raw markdown. Power user feature only. Hidden behind a "..." menu
