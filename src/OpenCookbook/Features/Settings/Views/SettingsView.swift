@@ -11,6 +11,13 @@ struct SettingsView: View {
     @Environment(FolderManager.self) private var folderManager
     @AppStorage("autoNumberInstructions") private var autoNumberInstructions = true
     @AppStorage("amountDisplayFormat") private var amountDisplayFormat: String = AmountDisplayFormat.original.rawValue
+    @AppStorage("importProvider") private var importProvider: String = "claude"
+    @AppStorage("claudeModel") private var claudeModelRawValue: String = AnthropicAPIService.ClaudeModel.sonnet.rawValue
+    @State private var apiKey: String = ""
+    @State private var isVerifyingKey = false
+    @State private var keyVerified = false
+    @State private var showKeyError = false
+    @State private var keyErrorMessage = ""
     @State private var showFolderPicker = false
     @State private var showChangeConfirmation = false
     @State private var selectedURL: URL?
@@ -65,6 +72,8 @@ struct SettingsView: View {
                 } footer: {
                     Text("Choose how ingredient amounts are displayed. Original shows amounts as written in the recipe file.")
                 }
+
+                importRecipeSection
 
                 #if DEBUG
                 Section {
@@ -140,6 +149,12 @@ struct SettingsView: View {
                     }
                 )
             }
+            .onAppear { loadAPIKey() }
+            .alert("API Key Error", isPresented: $showKeyError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(keyErrorMessage)
+            }
             .alert("Error Loading Samples", isPresented: $showSampleLoadError) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -155,7 +170,89 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Subviews
+
+    private var importRecipeSection: some View {
+        Section {
+            Picker("Provider", selection: $importProvider) {
+                Text("Claude (Anthropic)").tag("claude")
+            }
+
+            if importProvider == "claude" {
+                Picker("Model", selection: $claudeModelRawValue) {
+                    ForEach(AnthropicAPIService.ClaudeModel.allCases) { model in
+                        Text(model.displayName).tag(model.rawValue)
+                    }
+                }
+
+                SecureField("API Key", text: $apiKey)
+                    .textContentType(.password)
+                    .onSubmit { saveAPIKey() }
+                    .onChange(of: apiKey) { _, _ in keyVerified = false }
+
+                verifyKeyButton
+            }
+        } header: {
+            Text("Import Recipe")
+        } footer: {
+            Text("Used for importing recipes from websites. Get a key at console.anthropic.com")
+        }
+    }
+
+    private var verifyKeyButton: some View {
+        Button {
+            Task { await verifyKey() }
+        } label: {
+            HStack {
+                Text("Verify Key")
+                Spacer()
+                if isVerifyingKey {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                } else if keyVerified {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                }
+            }
+        }
+        .disabled(apiKey.isEmpty || isVerifyingKey)
+    }
+
     // MARK: - Helper Methods
+
+    private func loadAPIKey() {
+        if let key = try? KeychainService.read(key: "anthropic-api-key") {
+            apiKey = key
+        }
+    }
+
+    private func saveAPIKey() {
+        do {
+            if apiKey.isEmpty {
+                try KeychainService.delete(key: "anthropic-api-key")
+            } else {
+                try KeychainService.save(key: "anthropic-api-key", value: apiKey)
+            }
+        } catch {
+            keyErrorMessage = error.localizedDescription
+            showKeyError = true
+        }
+    }
+
+    private func verifyKey() async {
+        saveAPIKey()
+        isVerifyingKey = true
+        defer { isVerifyingKey = false }
+
+        do {
+            let service = AnthropicAPIService()
+            _ = try await service.verifyAPIKey(apiKey)
+            keyVerified = true
+        } catch {
+            keyErrorMessage = error.localizedDescription
+            showKeyError = true
+        }
+    }
 
     private func loadSampleRecipes() {
         isLoadingSamples = true

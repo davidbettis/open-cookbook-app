@@ -173,7 +173,9 @@ struct RecipeValidationError: Identifiable {
 /// ViewModel for recipe add/edit form
 @MainActor
 @Observable
-class RecipeFormViewModel {
+class RecipeFormViewModel: Identifiable {
+    nonisolated let id = UUID()
+
 
     // MARK: - Form Fields
 
