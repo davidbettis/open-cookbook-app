@@ -16,7 +16,6 @@ A free, open, standards-based recipe manager for iOS and macOS. Your recipes, yo
 - Create and edit recipes with a form-based editor or raw Markdown
 - Import recipes from websites using the Anthropic Claude API (bring your own key)
 - Automatic sync across your devices via iCloud Drive
-- Native SwiftUI interface with support for Dynamic Type and VoiceOver
 
 ## RecipeMD Format
 
@@ -49,11 +48,11 @@ Because recipes are plain text files, you can version them with Git, edit them i
 ## Requirements
 
 - iOS 17.0+ / macOS 14.0+
-- iCloud Drive
+- (optional) iCloud Drive
 
 ## Privacy
 
-Open Cookbook collects no data. All processing happens on your device. See [PRIVACY.md](PRIVACY.md) for the full privacy policy.
+See [PRIVACY.md](PRIVACY.md) for the full privacy policy.
 
 ## License
 
