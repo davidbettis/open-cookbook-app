@@ -65,6 +65,9 @@ struct RecipeListView: View {
     @State private var selectedError: (URL, Error)?
     @State private var showErrorAlert = false
     @State private var showAddRecipe = false
+    @State private var showImportRecipe = false
+    @State private var importedFormViewModel: RecipeFormViewModel?
+    @State private var pendingImportMarkdown: String?
     @State private var recipeToDelete: RecipeFile?
     @State private var showDeleteConfirmation = false
     @State private var deleteError: Error?
@@ -104,8 +107,17 @@ struct RecipeListView: View {
                         .accessibilityLabel("Open Cookbook")
                 }
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        showAddRecipe = true
+                    Menu {
+                        Button {
+                            showAddRecipe = true
+                        } label: {
+                            Label("New Recipe", systemImage: "square.and.pencil")
+                        }
+                        Button {
+                            showImportRecipe = true
+                        } label: {
+                            Label("Import from Website", systemImage: "globe")
+                        }
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -119,12 +131,28 @@ struct RecipeListView: View {
                 RecipeFormView(
                     viewModel: RecipeFormViewModel(mode: .add),
                     recipeStore: viewModel.recipeStore,
-                    onSave: { savedRecipe in
-                        // Recipe already added to store, sync search service immediately
-                        // This ensures the new recipe is searchable and visible right away
-                        viewModel.syncSearchService()
-                    }
+                    onSave: { _ in viewModel.syncSearchService() }
                 )
+            }
+            .fullScreenCover(item: $importedFormViewModel) { formVM in
+                RecipeFormView(
+                    viewModel: formVM,
+                    recipeStore: viewModel.recipeStore,
+                    onSave: { _ in viewModel.syncSearchService() }
+                )
+            }
+            .sheet(isPresented: $showImportRecipe) {
+                ImportRecipeView()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .importRecipeCompleted)) { notification in
+                guard let markdown = notification.userInfo?["markdown"] as? String else { return }
+                pendingImportMarkdown = markdown
+            }
+            .onChange(of: showImportRecipe) { _, isShowing in
+                if !isShowing, let markdown = pendingImportMarkdown {
+                    pendingImportMarkdown = nil
+                    handleImportedRecipe(markdown)
+                }
             }
             .alert("Parse Error", isPresented: $showErrorAlert, presenting: selectedError) { _ in
                 Button("OK") {
@@ -283,6 +311,22 @@ struct RecipeListView: View {
             deleteError = error
             showDeleteError = true
         }
+    }
+
+    /// Handle imported recipe markdown by parsing and pre-populating the form.
+    /// Setting importedFormViewModel triggers the item-based fullScreenCover.
+    private func handleImportedRecipe(_ markdown: String) {
+        let parser = RecipeMDParser()
+        let formVM = RecipeFormViewModel(mode: .add)
+        if let recipe = try? parser.parse(markdown) {
+            let tempFile = RecipeFile(
+                filePath: URL(fileURLWithPath: "/tmp/imported-recipe.md"),
+                recipe: recipe
+            )
+            formVM.populateFromRecipeFile(tempFile)
+        }
+        // Always set — the item-based fullScreenCover will present
+        importedFormViewModel = formVM
     }
 
     /// No results view when search/filter returns empty
