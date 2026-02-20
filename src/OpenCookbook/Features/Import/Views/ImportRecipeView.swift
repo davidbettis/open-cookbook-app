@@ -78,7 +78,7 @@ struct ImportRecipeView: View {
 
     private var urlInputSection: some View {
         Section {
-            TextField("https://example.com/recipe", text: $viewModel.urlText)
+            TextField("Paste recipe URL here", text: $viewModel.urlText)
                 .keyboardType(.URL)
                 .textContentType(.URL)
                 .autocorrectionDisabled()

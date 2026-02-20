@@ -18,6 +18,7 @@ struct SettingsView: View {
     @State private var keyVerified = false
     @State private var showKeyError = false
     @State private var keyErrorMessage = ""
+    @State private var showAPIKey = false
     @State private var showFolderPicker = false
     @State private var showChangeConfirmation = false
     @State private var selectedURL: URL?
@@ -185,17 +186,33 @@ struct SettingsView: View {
                     }
                 }
 
-                SecureField("API Key", text: $apiKey)
-                    .textContentType(.password)
-                    .onSubmit { saveAPIKey() }
-                    .onChange(of: apiKey) { _, _ in keyVerified = false }
+                HStack {
+                    if showAPIKey {
+                        TextField("API Key", text: $apiKey)
+                            .textContentType(.password)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                    } else {
+                        SecureField("API Key", text: $apiKey)
+                            .textContentType(.password)
+                    }
+                    Button {
+                        showAPIKey.toggle()
+                    } label: {
+                        Image(systemName: showAPIKey ? "eye.slash" : "eye")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .onSubmit { saveAPIKey() }
+                .onChange(of: apiKey) { _, _ in keyVerified = false }
 
                 verifyKeyButton
             }
         } header: {
             Text("Import Recipe")
         } footer: {
-            Text("Used for importing recipes from websites. Get a key at console.anthropic.com")
+            Text("Sign up for Claude and get a key at [platform.claude.com/settings/keys](https://platform.claude.com/settings/keys)")
         }
     }
 
