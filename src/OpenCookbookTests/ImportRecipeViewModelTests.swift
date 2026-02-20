@@ -143,4 +143,55 @@ struct ImportRecipeViewModelTests {
         #expect(cleaned.hasPrefix("# Pasta Carbonara"))
         #expect(!cleaned.contains("Here is the recipe"))
     }
+
+    // MARK: - Photo Import Tests
+
+    @Test("Default source is website")
+    func defaultSource() {
+        let vm = ImportRecipeViewModel()
+        #expect(vm.source == .website)
+    }
+
+    @Test("Photo status message when extracting")
+    func photoStatusMessage() {
+        let vm = ImportRecipeViewModel()
+        vm.source = .photo
+        vm.state = .extractingRecipe
+        #expect(vm.statusMessage == "Extracting recipe from photo...")
+    }
+
+    @Test("Website status message when extracting")
+    func websiteStatusMessage() {
+        let vm = ImportRecipeViewModel()
+        vm.source = .website
+        vm.state = .extractingRecipe
+        #expect(vm.statusMessage == "Extracting recipe with Claude...")
+    }
+
+    @Test("Import with no photo selected yields error")
+    func importNoPhoto() async {
+        let vm = ImportRecipeViewModel()
+        vm.source = .photo
+        vm.selectedImageData = nil
+        await vm.importRecipe()
+        if case .error(let message) = vm.state {
+            #expect(message == "No photo selected.")
+        } else {
+            #expect(Bool(false), "Expected error state")
+        }
+    }
+
+    @Test("ImportSource has website and photo cases")
+    func importSourceCases() {
+        let cases = ImportRecipeViewModel.ImportSource.allCases
+        #expect(cases.count == 2)
+        #expect(cases.contains(.website))
+        #expect(cases.contains(.photo))
+    }
+
+    @Test("Selected image data starts nil")
+    func selectedImageDataNil() {
+        let vm = ImportRecipeViewModel()
+        #expect(vm.selectedImageData == nil)
+    }
 }

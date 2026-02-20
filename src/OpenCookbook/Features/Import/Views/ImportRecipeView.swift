@@ -2,9 +2,10 @@
 //  ImportRecipeView.swift
 //  OpenCookbook
 //
-//  URL input sheet for importing recipes from websites via Claude
+//  Import sheet for importing recipes from websites or photos via Claude
 //
 
+import PhotosUI
 import SwiftUI
 
 extension Notification.Name {
@@ -12,10 +13,17 @@ extension Notification.Name {
 }
 
 struct ImportRecipeView: View {
+    var initialSource: ImportRecipeViewModel.ImportSource = .website
+
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel = ImportRecipeViewModel()
     @State private var showError = false
     @State private var errorMessage = ""
+
+    // Photo state
+    @State private var selectedImage: UIImage? = nil
+    @State private var selectedPhotoItem: PhotosPickerItem? = nil
+    @State private var showCamera = false
 
     var body: some View {
         NavigationStack {
@@ -23,7 +31,13 @@ struct ImportRecipeView: View {
                 if !viewModel.hasAPIKey {
                     noAPIKeySection
                 } else {
-                    urlInputSection
+                    switch viewModel.source {
+                    case .website:
+                        urlInputSection
+                    case .photo:
+                        photoInputSection
+                    }
+
                     if viewModel.isImporting {
                         loadingSection
                     }
@@ -58,8 +72,23 @@ struct ImportRecipeView: View {
                     break
                 }
             }
+            .onChange(of: selectedPhotoItem) { _, newItem in
+                Task { await loadPhoto(from: newItem) }
+            }
+            .fullScreenCover(isPresented: $showCamera) {
+                CameraView(image: $selectedImage)
+                    .ignoresSafeArea()
+            }
+            .onChange(of: selectedImage) { _, newImage in
+                processSelectedImage(newImage)
+            }
+            .onAppear {
+                viewModel.source = initialSource
+            }
         }
     }
+
+    // MARK: - Sections
 
     private var noAPIKeySection: some View {
         Section {
@@ -97,6 +126,58 @@ struct ImportRecipeView: View {
         }
     }
 
+    private var photoInputSection: some View {
+        Section {
+            if let image = selectedImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxHeight: 250)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+
+            HStack {
+                #if !targetEnvironment(simulator)
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    Button {
+                        showCamera = true
+                    } label: {
+                        Label(
+                            selectedImage == nil ? "Take Photo" : "Retake",
+                            systemImage: "camera"
+                        )
+                    }
+                    .buttonStyle(.bordered)
+                }
+                #endif
+
+                PhotosPicker(
+                    selection: $selectedPhotoItem,
+                    matching: .images
+                ) {
+                    Label(
+                        selectedImage == nil ? "Photo Library" : "Choose Different",
+                        systemImage: "photo.on.rectangle"
+                    )
+                }
+                .buttonStyle(.bordered)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+
+            Button {
+                Task { await viewModel.importRecipe() }
+            } label: {
+                Text("Import Recipe")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(selectedImage == nil || viewModel.isImporting)
+        } header: {
+            Text("Take a photo of a recipe or choose one from your library.")
+        }
+    }
+
     private var loadingSection: some View {
         Section {
             HStack(spacing: 12) {
@@ -106,6 +187,27 @@ struct ImportRecipeView: View {
             }
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 4)
+        }
+    }
+
+    // MARK: - Photo Handling
+
+    private func loadPhoto(from item: PhotosPickerItem?) async {
+        guard let item else { return }
+        if let data = try? await item.loadTransferable(type: Data.self),
+           let image = UIImage(data: data) {
+            selectedImage = image
+        }
+    }
+
+    private func processSelectedImage(_ image: UIImage?) {
+        guard let image else {
+            viewModel.selectedImageData = nil
+            return
+        }
+        if let data = ImportRecipeViewModel.resizeImageIfNeeded(image) {
+            viewModel.selectedImageData = data
+            viewModel.selectedImageMediaType = "image/jpeg"
         }
     }
 }

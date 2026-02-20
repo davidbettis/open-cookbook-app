@@ -2,8 +2,10 @@
 
 1.0.2
 - Add the ability to import a recipe from a website
+- Add the ability to import a recipe from a photo (camera or photo library)
 - Leverages Claude API (API key needed) to do the extraction
 - Uses Claude web helper tool to fetch the website
+- Uses Claude vision API to extract recipes from photos
 
 1.0.1
 - Add ingredient groups (e.g. one group for a sauce, another group for the core of the dish)

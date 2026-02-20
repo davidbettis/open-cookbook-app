@@ -70,4 +70,42 @@ struct AnthropicAPIServiceTests {
             #expect(model.id == model.rawValue)
         }
     }
+
+    // MARK: - Photo Prompt Tests
+
+    @Test("Photo prompt includes formatting instructions")
+    func photoPromptContainsInstructions() {
+        let prompt = AnthropicAPIService.buildPhotoPrompt()
+        #expect(prompt.contains("H1 heading"))
+        #expect(prompt.contains("horizontal rule"))
+        #expect(prompt.contains("Italicize quantities"))
+        #expect(prompt.contains("NOT_A_RECIPE"))
+    }
+
+    @Test("Photo prompt has photo-specific preamble")
+    func photoPromptPreamble() {
+        let prompt = AnthropicAPIService.buildPhotoPrompt()
+        #expect(prompt.contains("Extract the recipe from this photo"))
+    }
+
+    @Test("Photo prompt does not contain URL-related text")
+    func photoPromptNoURL() {
+        let prompt = AnthropicAPIService.buildPhotoPrompt()
+        #expect(!prompt.contains("Fetch the following URL"))
+    }
+
+    @Test("Website and photo prompts share formatting instructions")
+    func sharedInstructions() {
+        let websitePrompt = AnthropicAPIService.buildPrompt(url: "https://example.com")
+        let photoPrompt = AnthropicAPIService.buildPhotoPrompt()
+        // Both should contain the shared extraction instructions
+        #expect(websitePrompt.contains(AnthropicAPIService.recipeExtractionInstructions))
+        #expect(photoPrompt.contains(AnthropicAPIService.recipeExtractionInstructions))
+    }
+
+    @Test("imageTooLarge error has correct description")
+    func imageTooLargeError() {
+        let error = AnthropicAPIService.APIError.imageTooLarge
+        #expect(error.errorDescription?.contains("too large") == true)
+    }
 }
