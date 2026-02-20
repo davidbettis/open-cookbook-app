@@ -79,33 +79,27 @@ class RecipeFileMonitor {
             return []
         }
 
-        // Start accessing security-scoped resource
-        let didStartAccess = folder.startAccessingSecurityScopedResource()
-        defer {
-            if didStartAccess {
-                folder.stopAccessingSecurityScopedResource()
+        return folder.withSecurityScopedAccess {
+            do {
+                let contents = try FileManager.default.contentsOfDirectory(
+                    at: folder,
+                    includingPropertiesForKeys: [.isRegularFileKey],
+                    options: [.skipsHiddenFiles]
+                )
+
+                // Filter for .md files and sort by name
+                fileURLs = contents
+                    .filter { $0.pathExtension.lowercased() == "md" }
+                    .sorted { $0.lastPathComponent < $1.lastPathComponent }
+
+                return fileURLs
+            } catch {
+                #if DEBUG
+                print("[RecipeFileMonitor] Error scanning folder: \(error.localizedDescription)")
+                #endif
+                fileURLs = []
+                return []
             }
-        }
-
-        do {
-            let contents = try FileManager.default.contentsOfDirectory(
-                at: folder,
-                includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles]
-            )
-
-            // Filter for .md files and sort by name
-            fileURLs = contents
-                .filter { $0.pathExtension.lowercased() == "md" }
-                .sorted { $0.lastPathComponent < $1.lastPathComponent }
-
-            return fileURLs
-        } catch {
-            #if DEBUG
-            print("[RecipeFileMonitor] Error scanning folder: \(error.localizedDescription)")
-            #endif
-            fileURLs = []
-            return []
         }
     }
 

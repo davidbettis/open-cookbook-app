@@ -78,34 +78,15 @@ struct EditableIngredient: Identifiable {
         return nil
     }
 
-    /// Unicode fraction lookup table
-    private static let unicodeFractions: [Character: Double] = [
-        "½": 0.5,
-        "⅓": 1.0 / 3.0,
-        "⅔": 2.0 / 3.0,
-        "¼": 0.25,
-        "¾": 0.75,
-        "⅕": 0.2,
-        "⅖": 0.4,
-        "⅗": 0.6,
-        "⅘": 0.8,
-        "⅙": 1.0 / 6.0,
-        "⅚": 5.0 / 6.0,
-        "⅛": 0.125,
-        "⅜": 0.375,
-        "⅝": 0.625,
-        "⅞": 0.875,
-    ]
-
     /// Parse a quantity string (handles fractions and unicode fractions)
     private func parseQuantity(_ str: String) -> Double? {
         // Handle single unicode fraction like "½"
-        if str.count == 1, let value = Self.unicodeFractions[str.first!] {
+        if str.count == 1, let first = str.first, let value = UnicodeFractions.value(for: first) {
             return value
         }
 
         // Handle mixed number with unicode fraction like "1½"
-        if let last = str.last, let fractionValue = Self.unicodeFractions[last] {
+        if let last = str.last, let fractionValue = UnicodeFractions.value(for: last) {
             let wholeStr = String(str.dropLast())
             if let whole = Double(wholeStr) {
                 return whole + fractionValue
@@ -307,14 +288,10 @@ class RecipeFormViewModel {
     func generateMarkdown() -> String {
         // In edit mode with no form changes, read original file content
         if case .edit(let originalFile) = mode, !hasUnsavedChanges {
-            let fileURL = originalFile.filePath
-            let didStartAccess = fileURL.startAccessingSecurityScopedResource()
-            defer {
-                if didStartAccess {
-                    fileURL.stopAccessingSecurityScopedResource()
-                }
+            let content: String? = originalFile.filePath.withSecurityScopedAccess {
+                try? String(contentsOf: originalFile.filePath, encoding: .utf8)
             }
-            if let content = try? String(contentsOf: fileURL, encoding: .utf8) {
+            if let content {
                 return content
             }
         }
@@ -561,22 +538,13 @@ class RecipeFormViewModel {
 
         let fileURL = originalFile.filePath
 
-        // Start accessing security-scoped resource if needed
-        let didStartAccess = fileURL.startAccessingSecurityScopedResource()
-        defer {
-            if didStartAccess {
-                fileURL.stopAccessingSecurityScopedResource()
+        return fileURL.withSecurityScopedAccess {
+            guard let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
+                  let currentDate = attributes[.modificationDate] as? Date else {
+                return false
             }
+            return abs(currentDate.timeIntervalSince(originalDate)) > 1.0
         }
-
-        // Get current file modification date
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: fileURL.path),
-              let currentDate = attributes[.modificationDate] as? Date else {
-            return false
-        }
-
-        // Compare dates (allow 1 second tolerance for filesystem precision)
-        return abs(currentDate.timeIntervalSince(originalDate)) > 1.0
     }
 
     /// Save the recipe

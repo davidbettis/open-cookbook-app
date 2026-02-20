@@ -43,19 +43,10 @@ struct FolderPicker: View {
         let response = panel.runModal()
 
         if response == .OK, let url = panel.url {
-            // Start accessing security-scoped resource
-            // Note: This may return false if the URL doesn't require security scoping,
-            // so we continue regardless. We only call stop if we successfully started.
-            let didStartAccess = url.startAccessingSecurityScopedResource()
-
-            defer {
-                if didStartAccess {
-                    url.stopAccessingSecurityScopedResource()
-                }
+            url.withSecurityScopedAccess {
+                selectedURL = url
+                onSelect(url)
             }
-
-            selectedURL = url
-            onSelect(url)
         } else {
             onCancel()
         }
@@ -106,20 +97,10 @@ struct FolderPicker: UIViewControllerRepresentable {
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             guard let url = urls.first else { return }
 
-            // Start accessing security-scoped resource
-            // Note: This may return false if the URL doesn't require security scoping,
-            // so we continue regardless. We only call stop if we successfully started.
-            let didStartAccess = url.startAccessingSecurityScopedResource()
-
-            // Ensure we stop accessing when done (only if we started)
-            defer {
-                if didStartAccess {
-                    url.stopAccessingSecurityScopedResource()
-                }
+            url.withSecurityScopedAccess {
+                parent.selectedURL = url
+                parent.onSelect(url)
             }
-
-            parent.selectedURL = url
-            parent.onSelect(url)
         }
 
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {

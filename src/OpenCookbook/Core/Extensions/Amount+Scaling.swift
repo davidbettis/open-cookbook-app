@@ -94,19 +94,6 @@ extension Amount {
 
     // MARK: - Unicode Fraction Formatting
 
-    /// Lookup table mapping fractional remainders to Unicode fraction characters
-    private static let unicodeFractions: [(Double, Character)] = [
-        (1.0/8.0, "⅛"),
-        (1.0/4.0, "¼"),
-        (1.0/3.0, "⅓"),
-        (3.0/8.0, "⅜"),
-        (1.0/2.0, "½"),
-        (5.0/8.0, "⅝"),
-        (2.0/3.0, "⅔"),
-        (3.0/4.0, "¾"),
-        (7.0/8.0, "⅞"),
-    ]
-
     /// Converts a Double to a Unicode fraction string (e.g., 1.5 → "1½", 0.25 → "¼")
     static func formatFractionUnicode(_ value: Double) -> String {
         guard !value.isZero else { return "0" }
@@ -120,13 +107,11 @@ extension Amount {
         }
 
         // Match remainder to a Unicode fraction
-        for (fractionValue, character) in unicodeFractions {
-            if abs(remainder - fractionValue) < 0.01 {
-                if whole > 0 {
-                    return "\(whole)\(character)"
-                }
-                return String(character)
+        if let character = UnicodeFractions.character(for: remainder) {
+            if whole > 0 {
+                return "\(whole)\(character)"
             }
+            return String(character)
         }
 
         // No match — fall back to decimal

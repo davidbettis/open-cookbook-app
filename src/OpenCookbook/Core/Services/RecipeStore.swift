@@ -113,18 +113,11 @@ class RecipeStore {
         isSaving = true
         defer { isSaving = false }
 
-        // Start accessing security-scoped resource
-        let didStartAccess = folder.startAccessingSecurityScopedResource()
-        defer {
-            if didStartAccess {
-                folder.stopAccessingSecurityScopedResource()
-            }
-        }
-
-        // Generate unique filename
-        let fileURL: URL
-        do {
-            fileURL = try filenameGenerator.generateFileURL(for: recipeFile.title, in: folder)
+        return try folder.withSecurityScopedAccess {
+            // Generate unique filename
+            let fileURL: URL
+            do {
+                fileURL = try filenameGenerator.generateFileURL(for: recipeFile.title, in: folder)
         } catch {
             throw RecipeWriteError.invalidFilename
         }
@@ -154,7 +147,8 @@ class RecipeStore {
         }
         recipeCache[fileURL] = CachedRecipeFile(recipeFile: savedRecipeFile, modificationDate: Date())
 
-        return savedRecipeFile
+            return savedRecipeFile
+        }
     }
 
     /// Update an existing recipe
@@ -166,25 +160,18 @@ class RecipeStore {
 
         let fileURL = recipeFile.filePath
 
-        // Start accessing security-scoped resource
-        let didStartAccess = fileURL.startAccessingSecurityScopedResource()
-        defer {
-            if didStartAccess {
-                fileURL.stopAccessingSecurityScopedResource()
+        try fileURL.withSecurityScopedAccess {
+            // Verify file exists
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                throw RecipeWriteError.writeError(underlying: NSError(
+                    domain: "RecipeStore",
+                    code: -1,
+                    userInfo: [NSLocalizedDescriptionKey: "Original file not found"]
+                ))
             }
-        }
 
-        // Verify file exists
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            throw RecipeWriteError.writeError(underlying: NSError(
-                domain: "RecipeStore",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Original file not found"]
-            ))
-        }
-
-        // Serialize recipe to markdown
-        let markdown = serializer.serialize(recipeFile)
+            // Serialize recipe to markdown
+            let markdown = serializer.serialize(recipeFile)
 
         // Write to file atomically (overwrites existing)
         do {
@@ -211,6 +198,7 @@ class RecipeStore {
 
         // Update cache
         recipeCache[fileURL] = CachedRecipeFile(recipeFile: updatedRecipeFile, modificationDate: Date())
+        }
     }
 
     /// Save a new recipe from raw markdown content
@@ -224,18 +212,11 @@ class RecipeStore {
         isSaving = true
         defer { isSaving = false }
 
-        // Start accessing security-scoped resource
-        let didStartAccess = folder.startAccessingSecurityScopedResource()
-        defer {
-            if didStartAccess {
-                folder.stopAccessingSecurityScopedResource()
-            }
-        }
-
-        // Generate unique filename
-        let fileURL: URL
-        do {
-            fileURL = try filenameGenerator.generateFileURL(for: title, in: folder)
+        return try folder.withSecurityScopedAccess {
+            // Generate unique filename
+            let fileURL: URL
+            do {
+                fileURL = try filenameGenerator.generateFileURL(for: title, in: folder)
         } catch {
             throw RecipeWriteError.invalidFilename
         }
@@ -262,7 +243,8 @@ class RecipeStore {
         }
         recipeCache[fileURL] = CachedRecipeFile(recipeFile: savedRecipeFile, modificationDate: Date())
 
-        return savedRecipeFile
+            return savedRecipeFile
+        }
     }
 
     /// Update an existing recipe from raw markdown content
@@ -276,16 +258,9 @@ class RecipeStore {
 
         let fileURL = filePath
 
-        // Start accessing security-scoped resource
-        let didStartAccess = fileURL.startAccessingSecurityScopedResource()
-        defer {
-            if didStartAccess {
-                fileURL.stopAccessingSecurityScopedResource()
-            }
-        }
-
-        // Verify file exists
-        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+        try fileURL.withSecurityScopedAccess {
+            // Verify file exists
+            guard FileManager.default.fileExists(atPath: fileURL.path) else {
             throw RecipeWriteError.writeError(underlying: NSError(
                 domain: "RecipeStore",
                 code: -1,
@@ -318,6 +293,7 @@ class RecipeStore {
 
         // Update cache
         recipeCache[fileURL] = CachedRecipeFile(recipeFile: updatedRecipeFile, modificationDate: Date())
+        }
     }
 
     /// Delete a recipe
@@ -326,15 +302,8 @@ class RecipeStore {
     func deleteRecipe(_ recipeFile: RecipeFile) async throws {
         let fileURL = recipeFile.filePath
 
-        // Start accessing security-scoped resource
-        let didStartAccess = fileURL.startAccessingSecurityScopedResource()
-        defer {
-            if didStartAccess {
-                fileURL.stopAccessingSecurityScopedResource()
-            }
-        }
-
-        // Check if file exists
+        try fileURL.withSecurityScopedAccess {
+            // Check if file exists
         let fileExists = FileManager.default.fileExists(atPath: fileURL.path)
 
         if fileExists {
@@ -371,6 +340,7 @@ class RecipeStore {
 
         // Remove from parse errors if present
         parseErrors.removeValue(forKey: fileURL)
+        }
     }
 
     // MARK: - Private Methods

@@ -147,16 +147,10 @@ struct RecipeDetailView: View {
 
     private func loadRecipeContent() async {
         do {
-            // Start accessing security-scoped resource if needed
             let fileToLoad = currentRecipeFile?.filePath ?? recipeFile.filePath
-            let didStartAccess = fileToLoad.startAccessingSecurityScopedResource()
-            defer {
-                if didStartAccess {
-                    fileToLoad.stopAccessingSecurityScopedResource()
-                }
+            let data = try fileToLoad.withSecurityScopedAccess {
+                try Data(contentsOf: fileToLoad)
             }
-
-            let data = try Data(contentsOf: fileToLoad)
             guard let content = String(data: data, encoding: .utf8) else {
                 throw RecipeParseError.encodingError
             }
@@ -176,21 +170,9 @@ struct RecipeDetailView: View {
     private func loadFullRecipeAndEdit() {
         let fileURL = currentRecipeFile?.filePath ?? recipeFile.filePath
 
-        // Access security-scoped resource
-        let didStartAccess = fileURL.startAccessingSecurityScopedResource()
-        defer {
-            if didStartAccess {
-                fileURL.stopAccessingSecurityScopedResource()
-            }
-        }
-
-        do {
-            // Parse full recipe and set it - this triggers sheet presentation
-            recipeToEdit = try parser.parse(from: fileURL)
-        } catch {
-            // Fall back to partial recipe if full parse fails
-            recipeToEdit = currentRecipeFile ?? recipeFile
-        }
+        recipeToEdit = fileURL.withSecurityScopedAccess {
+            try? parser.parse(from: fileURL)
+        } ?? currentRecipeFile ?? recipeFile
     }
 
     // MARK: - Delete
