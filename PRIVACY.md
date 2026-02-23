@@ -5,7 +5,7 @@ layout: base
 
 # Privacy Policy for Open Cookbook
 
-Last updated: 2026-02-19
+Last updated: 2026-02-22
 
 ## No Data Collection by Us
 
@@ -18,7 +18,7 @@ What This Means:
 * No crash reporting that sends data to us
 * No user accounts or authentication
 * No data stored on external servers controlled by us
-* All processing happens locally on your device, except for the optional Import from Website feature (see below)
+* All processing happens locally on your device, except for the optional Import features (see below)
 
 ## Your Recipe Data
 
@@ -39,6 +39,21 @@ Open Cookbook includes an optional feature that lets you import recipes from web
 * Your API key is sent to Anthropic to authenticate the request.
 * No other personal data is sent — only the URL and your API key.
 
+## Import from Photo (Optional)
+
+Open Cookbook includes an optional feature that lets you import recipes from photos (such as cookbook pages, handwritten recipes, or screenshots) using the Anthropic Claude API. This feature is entirely opt-in and requires you to provide your own Anthropic API key.
+
+**When you use this feature:**
+
+* The photo you select or capture is sent to Anthropic's API servers, where Claude analyzes the image and extracts the recipe content.
+* Your API key is sent to Anthropic to authenticate the request.
+* No other personal data is sent — only the image and your API key.
+* The photo is not stored by Open Cookbook after the import is complete.
+
+## Anthropic API Key and Data Processing
+
+The Import from Website and Import from Photo features both use the Anthropic Claude API. The following applies to both features:
+
 **How your API key is stored:**
 
 * Your API key is stored locally in the iOS Keychain, Apple's secure on-device credential storage. It is never stored in plain text or transmitted to us.
@@ -46,10 +61,10 @@ Open Cookbook includes an optional feature that lets you import recipes from web
 
 **Third-party data processing:**
 
-* Recipe extraction is performed by Anthropic's Claude API. When you use this feature, the URL you provide and the web page content Claude retrieves are subject to [Anthropic's privacy policy](https://www.anthropic.com/privacy) and [usage policy](https://www.anthropic.com/policies/usage-policy).
+* Recipe extraction is performed by Anthropic's Claude API. When you use these features, the data you provide (URLs or photos) and the content Claude processes are subject to [Anthropic's privacy policy](https://www.anthropic.com/privacy) and [usage policy](https://www.anthropic.com/policies/usage-policy).
 * We do not receive, log, or have access to any data exchanged between your device and Anthropic's servers.
 
-**If you do not use this feature**, no data is ever sent to Anthropic or any other third-party AI service.
+**If you do not use these features**, no data is ever sent to Anthropic or any other third-party AI service.
 
 ## Images in Recipes
 
