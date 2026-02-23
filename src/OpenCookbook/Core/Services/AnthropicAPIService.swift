@@ -2,7 +2,7 @@
 //  AnthropicAPIService.swift
 //  OpenCookbook
 //
-//  Anthropic Messages API client for extracting recipes from URLs
+//  Anthropic Messages API client for extracting recipes from URLs and photos
 //
 
 import Foundation
@@ -18,6 +18,7 @@ class AnthropicAPIService {
         case rateLimited
         case invalidAPIKey
         case notARecipe
+        case imageTooLarge
 
         var errorDescription: String? {
             switch self {
@@ -32,6 +33,7 @@ class AnthropicAPIService {
             case .rateLimited: return "Rate limited. Please wait a moment and try again."
             case .invalidAPIKey: return "Your API key is invalid. Update it in Settings."
             case .notARecipe: return "This page doesn't appear to contain a recipe."
+            case .imageTooLarge: return "The image is too large. Try a smaller photo or lower resolution."
             }
         }
 
@@ -44,6 +46,7 @@ class AnthropicAPIService {
             case (.rateLimited, .rateLimited): return true
             case (.invalidAPIKey, .invalidAPIKey): return true
             case (.notARecipe, .notARecipe): return true
+            case (.imageTooLarge, .imageTooLarge): return true
             default: return false
             }
         }
@@ -89,24 +92,44 @@ class AnthropicAPIService {
             ]
         ]
 
-        let data = try await sendRequest(apiKey: apiKey, body: body)
+        return try await extractRecipeFromResponse(apiKey: apiKey, body: body)
+    }
 
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let content = json["content"] as? [[String: Any]] else {
-            throw .decodingError
-        }
+    /// Extract a recipe from a photo by sending the image to Claude.
+    func extractRecipeFromImage(
+        imageData: Data,
+        mediaType: String,
+        apiKey: String,
+        model: ClaudeModel
+    ) async throws(APIError) -> String {
+        let base64Image = imageData.base64EncodedString()
+        let prompt = Self.buildPhotoPrompt()
 
-        // The response contains multiple content blocks. Find the last text block,
-        // which is Claude's analysis after fetching the page.
-        guard let text = content.last(where: { $0["type"] as? String == "text" })?["text"] as? String else {
-            throw .decodingError
-        }
+        let body: [String: Any] = [
+            "model": model.rawValue,
+            "max_tokens": 8192,
+            "messages": [
+                [
+                    "role": "user",
+                    "content": [
+                        [
+                            "type": "image",
+                            "source": [
+                                "type": "base64",
+                                "media_type": mediaType,
+                                "data": base64Image
+                            ] as [String: Any]
+                        ] as [String: Any],
+                        [
+                            "type": "text",
+                            "text": prompt
+                        ] as [String: Any]
+                    ]
+                ] as [String: Any]
+            ]
+        ]
 
-        if text.trimmingCharacters(in: .whitespacesAndNewlines) == "NOT_A_RECIPE" {
-            throw .notARecipe
-        }
-
-        return Self.stripImageSyntax(text)
+        return try await extractRecipeFromResponse(apiKey: apiKey, body: body)
     }
 
     /// Verify the API key with a minimal request.
@@ -130,13 +153,8 @@ class AnthropicAPIService {
         )
     }
 
-    /// Build the extraction prompt with URL interpolated.
-    static func buildPrompt(url: String) -> String {
-        """
-        Fetch the following URL and extract the recipe into structured markdown format:
-
-        \(url)
-
+    /// Shared recipe formatting instructions used by both website and photo prompts.
+    static let recipeExtractionInstructions = """
         Format the recipe with these exact specifications:
         1. Title: Use H1 heading (single #)
         2. Tags: On the next line, add italicized tags separated by commas (e.g., asian, slow-cooker)
@@ -159,15 +177,56 @@ class AnthropicAPIService {
 
         Important rules:
         - Do NOT include any images, image links, or markdown image syntax (![...](...)). The output must be plain text and markdown only.
-        - If the page does not contain a recipe, respond with exactly: NOT_A_RECIPE
+        - If the content does not contain a recipe, respond with exactly: NOT_A_RECIPE
         - Do not attempt to fabricate a recipe from non-recipe content.
         - Do NOT wrap your response in code fences. Output the raw markdown directly.
 
         Output ONLY the recipe markdown, with no preamble or commentary.
         """
+
+    /// Build the extraction prompt with URL interpolated.
+    static func buildPrompt(url: String) -> String {
+        """
+        Fetch the following URL and extract the recipe into structured markdown format:
+
+        \(url)
+
+        \(recipeExtractionInstructions)
+        """
+    }
+
+    /// Build the extraction prompt for a photo.
+    static func buildPhotoPrompt() -> String {
+        """
+        Extract the recipe from this photo into structured markdown format.
+
+        \(recipeExtractionInstructions)
+        """
     }
 
     // MARK: - Private
+
+    /// Shared response parsing for both website and photo extraction.
+    private func extractRecipeFromResponse(apiKey: String, body: [String: Any]) async throws(APIError) -> String {
+        let data = try await sendRequest(apiKey: apiKey, body: body)
+
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let content = json["content"] as? [[String: Any]] else {
+            throw .decodingError
+        }
+
+        // Find the last text block — for website imports this is Claude's analysis
+        // after fetching the page; for photo imports it's the direct response.
+        guard let text = content.last(where: { $0["type"] as? String == "text" })?["text"] as? String else {
+            throw .decodingError
+        }
+
+        if text.trimmingCharacters(in: .whitespacesAndNewlines) == "NOT_A_RECIPE" {
+            throw .notARecipe
+        }
+
+        return Self.stripImageSyntax(text)
+    }
 
     /// Send a request to the Anthropic Messages API and handle common error responses.
     private func sendRequest(apiKey: String, body: [String: Any]) async throws(APIError) -> Data {

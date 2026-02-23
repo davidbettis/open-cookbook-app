@@ -2,7 +2,7 @@
 //  ImportRecipeViewModel.swift
 //  OpenCookbook
 //
-//  Orchestrates the import flow: validate URL -> call Claude API -> parse result
+//  Orchestrates the import flow: validate input -> call Claude API -> parse result
 //
 
 import Foundation
@@ -10,11 +10,22 @@ import os.log
 import RecipeMD
 import SwiftUI
 
+#if canImport(UIKit)
+import UIKit
+#endif
+
 private let logger = Logger(subsystem: "com.opencookbook", category: "Import")
 
 @MainActor
 @Observable
 class ImportRecipeViewModel {
+    enum ImportSource: String, CaseIterable, Identifiable {
+        case website
+        case photo
+
+        var id: String { rawValue }
+    }
+
     enum ImportState: Equatable {
         case idle
         case extractingRecipe
@@ -22,7 +33,10 @@ class ImportRecipeViewModel {
         case error(String)
     }
 
+    var source: ImportSource = .website
     var urlText: String = ""
+    var selectedImageData: Data? = nil
+    var selectedImageMediaType: String = "image/jpeg"
     var state: ImportState = .idle
 
     @ObservationIgnored
@@ -35,7 +49,10 @@ class ImportRecipeViewModel {
 
     var statusMessage: String {
         switch state {
-        case .extractingRecipe: return "Extracting recipe with Claude..."
+        case .extractingRecipe:
+            return source == .website
+                ? "Extracting recipe with Claude..."
+                : "Extracting recipe from photo..."
         default: return ""
         }
     }
@@ -46,6 +63,17 @@ class ImportRecipeViewModel {
     }
 
     func importRecipe() async {
+        switch source {
+        case .website:
+            await importFromWebsite()
+        case .photo:
+            await importFromPhoto()
+        }
+    }
+
+    // MARK: - Website Import
+
+    private func importFromWebsite() async {
         guard let url = URL(string: urlText),
               let scheme = url.scheme,
               scheme == "http" || scheme == "https" else {
@@ -98,6 +126,88 @@ class ImportRecipeViewModel {
             state = .error("Could not extract a recipe from this page. Try a different URL.")
         }
     }
+
+    // MARK: - Photo Import
+
+    private func importFromPhoto() async {
+        guard let imageData = selectedImageData else {
+            state = .error("No photo selected.")
+            return
+        }
+
+        do {
+            guard let apiKey = try KeychainService.read(key: "anthropic-api-key"), !apiKey.isEmpty else {
+                state = .error("No API key configured. Add your key in Settings.")
+                return
+            }
+            let model = AnthropicAPIService.ClaudeModel(rawValue: claudeModelRawValue) ?? .sonnet
+
+            state = .extractingRecipe
+            logger.debug("Importing recipe from photo (\(imageData.count) bytes) using model \(model.rawValue)")
+
+            let service = AnthropicAPIService()
+            let rawMarkdown = try await service.extractRecipeFromImage(
+                imageData: imageData,
+                mediaType: selectedImageMediaType,
+                apiKey: apiKey,
+                model: model
+            )
+
+            #if DEBUG
+            logger.debug("Raw Claude response (\(rawMarkdown.count) chars):\n\(rawMarkdown)")
+            #endif
+
+            let markdown = Self.cleanMarkdown(rawMarkdown)
+
+            #if DEBUG
+            logger.debug("Cleaned markdown (\(markdown.count) chars):\n\(markdown)")
+            #endif
+
+            let trimmed = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.hasPrefix("# ") else {
+                logger.error("Response does not start with '# ' — not a valid recipe heading")
+                state = .error("Could not extract a recipe from this photo. Try a different photo.")
+                return
+            }
+
+            state = .success(markdown)
+        } catch let error as AnthropicAPIService.APIError {
+            logger.error("API error: \(error.errorDescription ?? "unknown")")
+            state = .error(error.errorDescription ?? "An unknown error occurred.")
+        } catch {
+            logger.error("Import failed: \(error.localizedDescription)")
+            state = .error("Could not extract a recipe from this photo. Try a different photo.")
+        }
+    }
+
+    // MARK: - Image Resizing
+
+    #if canImport(UIKit)
+    /// Resize a UIImage to fit within maxBytes when JPEG-encoded.
+    /// The API limit is ~5MB for base64-encoded data; default maxBytes accounts for 33% base64 expansion.
+    static func resizeImageIfNeeded(_ image: UIImage, maxBytes: Int = 3_750_000) -> Data? {
+        // Try compression first, stepping down quality
+        var quality: CGFloat = 0.8
+        while quality > 0.1 {
+            if let data = image.jpegData(compressionQuality: quality),
+               data.count <= maxBytes {
+                return data
+            }
+            quality -= 0.1
+        }
+
+        // If still too large, scale down dimensions and retry
+        let scale: CGFloat = 0.5
+        let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        let resized = renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+        return resized.jpegData(compressionQuality: 0.7)
+    }
+    #endif
+
+    // MARK: - Markdown Cleaning
 
     /// Extract the recipe markdown from Claude's response.
     /// Handles: code fences (embedded or wrapping), preamble text, trailing caveats.

@@ -65,7 +65,7 @@ struct RecipeListView: View {
     @State private var selectedError: (URL, Error)?
     @State private var showErrorAlert = false
     @State private var showAddRecipe = false
-    @State private var showImportRecipe = false
+    @State private var importSource: ImportRecipeViewModel.ImportSource?
     @State private var importedFormViewModel: RecipeFormViewModel?
     @State private var pendingImportMarkdown: String?
     @State private var recipeToDelete: RecipeFile?
@@ -114,9 +114,14 @@ struct RecipeListView: View {
                             Label("New Recipe", systemImage: "square.and.pencil")
                         }
                         Button {
-                            showImportRecipe = true
+                            importSource = .website
                         } label: {
                             Label("Import from Website", systemImage: "globe")
+                        }
+                        Button {
+                            importSource = .photo
+                        } label: {
+                            Label("Import from Photo", systemImage: "camera")
                         }
                     } label: {
                         Image(systemName: "plus")
@@ -141,15 +146,15 @@ struct RecipeListView: View {
                     onSave: { _ in viewModel.syncSearchService() }
                 )
             }
-            .sheet(isPresented: $showImportRecipe) {
-                ImportRecipeView()
+            .sheet(item: $importSource) { source in
+                ImportRecipeView(initialSource: source)
             }
             .onReceive(NotificationCenter.default.publisher(for: .importRecipeCompleted)) { notification in
                 guard let markdown = notification.userInfo?["markdown"] as? String else { return }
                 pendingImportMarkdown = markdown
             }
-            .onChange(of: showImportRecipe) { _, isShowing in
-                if !isShowing, let markdown = pendingImportMarkdown {
+            .onChange(of: importSource) { _, newValue in
+                if newValue == nil, let markdown = pendingImportMarkdown {
                     pendingImportMarkdown = nil
                     handleImportedRecipe(markdown)
                 }
