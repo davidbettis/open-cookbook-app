@@ -1,5 +1,11 @@
 # Release History
 
+1.0.3
+- Add curated tag vocabulary with categories (cuisine, meal, method, diet, protein) and AI-biased suggestions based on usage frequency
+- Add structured tag picker with category sections, search, usage counts, and custom tag support
+- Add bulk tag editing: select multiple recipes and add or remove tags at once
+- Add local default folder option during onboarding
+
 1.0.2
 - Add the ability to import a recipe from a website
 - Add the ability to import a recipe from a photo (camera or photo library)
