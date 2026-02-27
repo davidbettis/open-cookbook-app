@@ -27,9 +27,9 @@ The app ships with a fixed vocabulary organized by category. This vocabulary is 
 
 | Category | Tags |
 |----------|------|
-| **Cuisine** | american, asian, chinese, french, greek, indian, italian, japanese, korean, mediterranean, mexican, middle-eastern, thai, vietnamese |
-| **Meal** | appetizer, main, snack, dessert, breakfast, brunch, lunch, dinner |
-| **Method** | baked, grilled, fried, slow-cooker, instant-pot, one-pot, no-cook, stir-fry, smoked, sous-vide |
+| **Cuisine** | american, asian, chinese, french, greek, indian, italian, japanese, korean, mediterranean, mexican, middle-eastern, southern, thai, vietnamese |
+| **Meal** | appetizer, main, snack, dessert, baking, breakfast, brunch |
+| **Method** | oven, grilled, fried, slow-cooker, instant-pot, one-pot, no-cook, stir-fry |
 | **Diet** | vegetarian, vegan, gluten-free, dairy-free |
 | **Protein** | chicken, beef, pork, lamb, seafood, fish, shrimp, tofu, eggs |
 

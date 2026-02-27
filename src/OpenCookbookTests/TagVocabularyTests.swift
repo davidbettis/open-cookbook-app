@@ -12,16 +12,16 @@ import Testing
 @Suite("TagVocabulary")
 struct TagVocabularyTests {
 
-    @Test("All built-in tags total 45")
+    @Test("All built-in tags total 43")
     func allBuiltInTagsCount() {
-        #expect(TagVocabulary.allBuiltInTags.count == 45)
+        #expect(TagVocabulary.allBuiltInTags.count == 43)
     }
 
     @Test("isBuiltIn returns true for known tags")
     func isBuiltInReturnsTrueForKnown() {
         #expect(TagVocabulary.isBuiltIn("italian") == true)
         #expect(TagVocabulary.isBuiltIn("chicken") == true)
-        #expect(TagVocabulary.isBuiltIn("sous-vide") == true)
+        #expect(TagVocabulary.isBuiltIn("one-pot") == true)
         #expect(TagVocabulary.isBuiltIn("gluten-free") == true)
     }
 
@@ -55,9 +55,9 @@ struct TagVocabularyTests {
 
     @Test("Each category has expected tag count")
     func categoriesHaveExpectedCounts() {
-        #expect(TagVocabulary.Category.cuisine.tags.count == 14)
-        #expect(TagVocabulary.Category.meal.tags.count == 8)
-        #expect(TagVocabulary.Category.method.tags.count == 10)
+        #expect(TagVocabulary.Category.cuisine.tags.count == 15)
+        #expect(TagVocabulary.Category.meal.tags.count == 7)
+        #expect(TagVocabulary.Category.method.tags.count == 8)
         #expect(TagVocabulary.Category.diet.tags.count == 4)
         #expect(TagVocabulary.Category.protein.tags.count == 9)
     }

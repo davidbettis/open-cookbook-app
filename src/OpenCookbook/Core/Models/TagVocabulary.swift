@@ -25,17 +25,17 @@ struct TagVocabulary {
                 return [
                     "american", "asian", "chinese", "french", "greek", "indian",
                     "italian", "japanese", "korean", "mediterranean",
-                    "mexican", "middle-eastern", "thai", "vietnamese"
+                    "mexican", "middle-eastern", "southern", "thai", "vietnamese"
                 ]
             case .meal:
                 return [
-                    "appetizer", "main", "snack", "dessert", "breakfast",
-                    "brunch", "lunch", "dinner"
+                    "appetizer", "main", "snack", "dessert", "baking",
+                    "breakfast", "brunch"
                 ]
             case .method:
                 return [
-                    "baked", "grilled", "fried", "slow-cooker", "instant-pot",
-                    "one-pot", "no-cook", "stir-fry", "smoked", "sous-vide"
+                    "oven", "grilled", "fried", "slow-cooker", "instant-pot",
+                    "one-pot", "no-cook", "stir-fry"
                 ]
             case .diet:
                 return ["vegetarian", "vegan", "gluten-free", "dairy-free"]

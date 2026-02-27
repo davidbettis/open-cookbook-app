@@ -20,7 +20,7 @@ struct TagFrequencyTests {
     func emptyLibraryReturnsAllBuiltIn() {
         let frequencies = RecipeSearchService.computeTagFrequencies(from: [])
 
-        #expect(frequencies.count == 45)
+        #expect(frequencies.count == 43)
         #expect(frequencies.allSatisfy { $0.count == 0 })
         #expect(frequencies.allSatisfy { $0.isBuiltIn })
     }
