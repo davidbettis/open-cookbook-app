@@ -209,3 +209,84 @@ struct TagInfo: Identifiable, Hashable {
     let name: String
     let count: Int
 }
+
+/// Tag frequency with category information for the tag picker and AI prompt
+struct TagFrequency: Identifiable, Hashable {
+    var id: String { name }
+    let name: String
+    let count: Int
+    let category: TagVocabulary.Category?  // nil = custom
+
+    var isBuiltIn: Bool { category != nil }
+}
+
+// MARK: - Tag Frequency Helpers
+
+extension RecipeSearchService {
+
+    /// Compute tag frequencies from a recipe list.
+    /// Returns all built-in tags (0 if unused) + custom tags, sorted by count desc then alpha.
+    static func computeTagFrequencies(from recipes: [RecipeFile]) -> [TagFrequency] {
+        var tagCounts: [String: Int] = [:]
+
+        for recipe in recipes {
+            for tag in recipe.tags {
+                let normalized = tag.lowercased().trimmingCharacters(in: .whitespaces)
+                guard !normalized.isEmpty else { continue }
+                tagCounts[normalized, default: 0] += 1
+            }
+        }
+
+        var frequencies: [TagFrequency] = []
+
+        // Add all built-in tags (with 0 count if unused)
+        for category in TagVocabulary.Category.allCases {
+            for tag in category.tags {
+                frequencies.append(TagFrequency(
+                    name: tag,
+                    count: tagCounts[tag] ?? 0,
+                    category: category
+                ))
+            }
+        }
+
+        // Add custom tags (not in built-in vocabulary)
+        let builtIn = TagVocabulary.allBuiltInTags
+        for (tag, count) in tagCounts where !builtIn.contains(tag) {
+            frequencies.append(TagFrequency(
+                name: tag,
+                count: count,
+                category: nil
+            ))
+        }
+
+        // Sort: descending count, then alphabetical for ties
+        frequencies.sort { lhs, rhs in
+            if lhs.count != rhs.count {
+                return lhs.count > rhs.count
+            }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+
+        return frequencies
+    }
+
+    /// Format tag frequencies as an AI prompt string.
+    static func tagFrequencyPrompt(from recipes: [RecipeFile]) -> String {
+        let frequencies = computeTagFrequencies(from: recipes)
+        guard !frequencies.isEmpty else { return "" }
+
+        var lines: [String] = []
+        lines.append("Tags: Select 2-4 tags from ONLY this list, preferring tags near the top:")
+
+        for freq in frequencies {
+            let prefix = freq.isBuiltIn ? "- " : "- [Custom] "
+            let suffix = freq.count == 1 ? "recipe" : "recipes"
+            lines.append("\(prefix)\(freq.name) (\(freq.count) \(suffix))")
+        }
+
+        lines.append("Do NOT invent tags outside this list.")
+
+        return lines.joined(separator: "\n")
+    }
+}

@@ -14,6 +14,7 @@ extension Notification.Name {
 
 struct ImportRecipeView: View {
     var initialSource: ImportRecipeViewModel.ImportSource = .website
+    var tagPrompt: String = ""
 
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel = ImportRecipeViewModel()
@@ -84,6 +85,7 @@ struct ImportRecipeView: View {
             }
             .onAppear {
                 viewModel.source = initialSource
+                viewModel.tagPrompt = tagPrompt
             }
         }
     }

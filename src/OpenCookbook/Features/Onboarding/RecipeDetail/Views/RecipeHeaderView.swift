@@ -92,61 +92,7 @@ private struct YieldView: View {
 
 // MARK: - Flow Layout
 
-/// A simple flow layout for wrapping tags
-private struct FlowLayout: Layout {
-    var spacing: CGFloat = 8
-
-    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let result = layoutSubviews(proposal: proposal, subviews: subviews)
-        return result.size
-    }
-
-    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let result = layoutSubviews(proposal: proposal, subviews: subviews)
-
-        for (index, position) in result.positions.enumerated() {
-            subviews[index].place(
-                at: CGPoint(x: bounds.minX + position.x, y: bounds.minY + position.y),
-                proposal: .unspecified
-            )
-        }
-    }
-
-    private func layoutSubviews(proposal: ProposedViewSize, subviews: Subviews) -> LayoutResult {
-        var positions: [CGPoint] = []
-        var currentX: CGFloat = 0
-        var currentY: CGFloat = 0
-        var lineHeight: CGFloat = 0
-        let maxWidth = proposal.width ?? .infinity
-
-        for subview in subviews {
-            let size = subview.sizeThatFits(.unspecified)
-
-            if currentX + size.width > maxWidth && currentX > 0 {
-                currentX = 0
-                currentY += lineHeight + spacing
-                lineHeight = 0
-            }
-
-            positions.append(CGPoint(x: currentX, y: currentY))
-            lineHeight = max(lineHeight, size.height)
-            currentX += size.width + spacing
-        }
-
-        let totalHeight = currentY + lineHeight
-        let totalWidth = maxWidth.isFinite ? maxWidth : currentX - spacing
-
-        return LayoutResult(
-            positions: positions,
-            size: CGSize(width: max(0, totalWidth), height: max(0, totalHeight))
-        )
-    }
-
-    private struct LayoutResult {
-        let positions: [CGPoint]
-        let size: CGSize
-    }
-}
+// FlowLayout is defined in TagPickerView.swift and shared across the app
 
 // MARK: - Previews
 

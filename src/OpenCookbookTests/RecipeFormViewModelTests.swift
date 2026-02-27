@@ -21,7 +21,7 @@ struct RecipeFormViewModelTests {
 
         #expect(viewModel.title == "")
         #expect(viewModel.descriptionText == "")
-        #expect(viewModel.tagsText == "")
+        #expect(viewModel.selectedTags.isEmpty)
         #expect(viewModel.yieldsText == "")
         #expect(viewModel.instructionGroups.count == 1)
         #expect(viewModel.instructionGroups[0].text == "")
@@ -53,7 +53,7 @@ struct RecipeFormViewModelTests {
 
         #expect(viewModel.title == "Test Recipe")
         #expect(viewModel.descriptionText == "Test description")
-        #expect(viewModel.tagsText == "tag1, tag2")
+        #expect(viewModel.selectedTags == Set(["tag1", "tag2"]))
         #expect(viewModel.instructionGroups.count == 1)
         #expect(viewModel.instructionGroups[0].text == "Test instructions")
         #expect(viewModel.navigationTitle == "Edit Recipe")
@@ -1107,5 +1107,93 @@ struct RecipeFormViewModelTests {
 
         // Should be the original file content, not re-serialized
         #expect(markdown == originalContent)
+    }
+
+    // MARK: - Tag Management Tests
+
+    @Test("toggleTag adds tag when not selected")
+    func toggleTagAdds() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+
+        viewModel.toggleTag("italian")
+
+        #expect(viewModel.selectedTags.contains("italian"))
+    }
+
+    @Test("toggleTag removes tag when already selected")
+    func toggleTagRemoves() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.selectedTags = ["italian", "chicken"]
+
+        viewModel.toggleTag("italian")
+
+        #expect(!viewModel.selectedTags.contains("italian"))
+        #expect(viewModel.selectedTags.contains("chicken"))
+    }
+
+    @Test("toggleTag normalizes to lowercase")
+    func toggleTagNormalizesToLowercase() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+
+        viewModel.toggleTag("Italian")
+
+        #expect(viewModel.selectedTags.contains("italian"))
+    }
+
+    @Test("addCustomTag adds normalized tag and clears text field")
+    func addCustomTagAddsAndClears() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.customTagText = "  Date-Night  "
+
+        viewModel.addCustomTag()
+
+        #expect(viewModel.selectedTags.contains("date-night"))
+        #expect(viewModel.customTagText == "")
+    }
+
+    @Test("addCustomTag does nothing for empty text")
+    func addCustomTagIgnoresEmpty() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.customTagText = "   "
+
+        viewModel.addCustomTag()
+
+        #expect(viewModel.selectedTags.isEmpty)
+    }
+
+    @Test("Populates selectedTags from existing recipe tags")
+    func populatesSelectedTagsFromRecipe() {
+        let recipe = Recipe(
+            title: "Test",
+            tags: ["Italian", "Chicken"],
+            ingredientGroups: [IngredientGroup(ingredients: [Ingredient(name: "flour")])]
+        )
+        let recipeFile = RecipeFile(filePath: URL(fileURLWithPath: "/tmp/test.md"), recipe: recipe)
+
+        let viewModel = RecipeFormViewModel(mode: .edit(recipeFile))
+
+        #expect(viewModel.selectedTags == Set(["italian", "chicken"]))
+    }
+
+    @Test("buildRecipeFile uses sorted selectedTags")
+    func buildRecipeFileUsesSortedSelectedTags() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        viewModel.title = "Test"
+        viewModel.selectedTags = ["chicken", "italian", "baked"]
+        viewModel.ingredients = [EditableIngredient(amount: "", name: "flour")]
+
+        let recipeFile = viewModel.buildRecipeFile()
+
+        #expect(recipeFile.recipe.tags == ["baked", "chicken", "italian"])
+    }
+
+    @Test("Detects tag selection changes")
+    func detectsTagSelectionChanges() {
+        let viewModel = RecipeFormViewModel(mode: .add)
+        #expect(viewModel.hasUnsavedChanges == false)
+
+        viewModel.toggleTag("italian")
+
+        #expect(viewModel.hasUnsavedChanges == true)
     }
 }

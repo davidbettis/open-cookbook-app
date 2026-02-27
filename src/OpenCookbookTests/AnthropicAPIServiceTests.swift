@@ -98,9 +98,10 @@ struct AnthropicAPIServiceTests {
     func sharedInstructions() {
         let websitePrompt = AnthropicAPIService.buildPrompt(url: "https://example.com")
         let photoPrompt = AnthropicAPIService.buildPhotoPrompt()
+        let shared = AnthropicAPIService.recipeExtractionInstructions(tagPrompt: "")
         // Both should contain the shared extraction instructions
-        #expect(websitePrompt.contains(AnthropicAPIService.recipeExtractionInstructions))
-        #expect(photoPrompt.contains(AnthropicAPIService.recipeExtractionInstructions))
+        #expect(websitePrompt.contains(shared))
+        #expect(photoPrompt.contains(shared))
     }
 
     @Test("imageTooLarge error has correct description")

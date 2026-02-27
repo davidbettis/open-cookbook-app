@@ -75,9 +75,10 @@ class AnthropicAPIService {
     func extractRecipe(
         from url: String,
         apiKey: String,
-        model: ClaudeModel
+        model: ClaudeModel,
+        tagPrompt: String = ""
     ) async throws(APIError) -> String {
-        let prompt = Self.buildPrompt(url: url)
+        let prompt = Self.buildPrompt(url: url, tagPrompt: tagPrompt)
         let body: [String: Any] = [
             "model": model.rawValue,
             "max_tokens": 8192,
@@ -100,10 +101,11 @@ class AnthropicAPIService {
         imageData: Data,
         mediaType: String,
         apiKey: String,
-        model: ClaudeModel
+        model: ClaudeModel,
+        tagPrompt: String = ""
     ) async throws(APIError) -> String {
         let base64Image = imageData.base64EncodedString()
-        let prompt = Self.buildPhotoPrompt()
+        let prompt = Self.buildPhotoPrompt(tagPrompt: tagPrompt)
 
         let body: [String: Any] = [
             "model": model.rawValue,
@@ -154,7 +156,8 @@ class AnthropicAPIService {
     }
 
     /// Shared recipe formatting instructions used by both website and photo prompts.
-    static let recipeExtractionInstructions = """
+    static func recipeExtractionInstructions(tagPrompt: String) -> String {
+        var instructions = """
         Format the recipe with these exact specifications:
         1. Title: Use H1 heading (single #)
         2. Tags: On the next line, add italicized tags separated by commas (e.g., asian, slow-cooker)
@@ -184,23 +187,30 @@ class AnthropicAPIService {
         Output ONLY the recipe markdown, with no preamble or commentary.
         """
 
+        if !tagPrompt.isEmpty {
+            instructions += "\n\n" + tagPrompt
+        }
+
+        return instructions
+    }
+
     /// Build the extraction prompt with URL interpolated.
-    static func buildPrompt(url: String) -> String {
+    static func buildPrompt(url: String, tagPrompt: String = "") -> String {
         """
         Fetch the following URL and extract the recipe into structured markdown format:
 
         \(url)
 
-        \(recipeExtractionInstructions)
+        \(recipeExtractionInstructions(tagPrompt: tagPrompt))
         """
     }
 
     /// Build the extraction prompt for a photo.
-    static func buildPhotoPrompt() -> String {
+    static func buildPhotoPrompt(tagPrompt: String = "") -> String {
         """
         Extract the recipe from this photo into structured markdown format.
 
-        \(recipeExtractionInstructions)
+        \(recipeExtractionInstructions(tagPrompt: tagPrompt))
         """
     }
 

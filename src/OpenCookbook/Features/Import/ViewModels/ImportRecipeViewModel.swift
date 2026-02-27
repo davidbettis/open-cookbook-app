@@ -38,6 +38,7 @@ class ImportRecipeViewModel {
     var selectedImageData: Data? = nil
     var selectedImageMediaType: String = "image/jpeg"
     var state: ImportState = .idle
+    var tagPrompt: String = ""
 
     @ObservationIgnored
     @AppStorage("claudeModel") private var claudeModelRawValue: String = AnthropicAPIService.ClaudeModel.sonnet.rawValue
@@ -95,7 +96,8 @@ class ImportRecipeViewModel {
             let rawMarkdown = try await service.extractRecipe(
                 from: urlText,
                 apiKey: apiKey,
-                model: model
+                model: model,
+                tagPrompt: tagPrompt
             )
 
             #if DEBUG
@@ -150,7 +152,8 @@ class ImportRecipeViewModel {
                 imageData: imageData,
                 mediaType: selectedImageMediaType,
                 apiKey: apiKey,
-                model: model
+                model: model,
+                tagPrompt: tagPrompt
             )
 
             #if DEBUG

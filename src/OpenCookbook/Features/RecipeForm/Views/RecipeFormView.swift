@@ -21,6 +21,7 @@ struct RecipeFormView: View {
 
     @State private var viewModel: RecipeFormViewModel
     let recipeStore: RecipeStore
+    let tagFrequencies: [TagFrequency]
     let onSave: ((RecipeFile) -> Void)?
 
     @State private var selectedTab: FormTab = .details
@@ -39,10 +40,12 @@ struct RecipeFormView: View {
     init(
         viewModel: RecipeFormViewModel,
         recipeStore: RecipeStore,
+        tagFrequencies: [TagFrequency] = [],
         onSave: ((RecipeFile) -> Void)? = nil
     ) {
         self._viewModel = State(initialValue: viewModel)
         self.recipeStore = recipeStore
+        self.tagFrequencies = tagFrequencies
         self.onSave = onSave
     }
 
@@ -210,15 +213,12 @@ struct RecipeFormView: View {
                 .accessibilityHint("Optional brief description of the recipe")
         }
 
-        Section {
-            TextField("dessert, quick, vegetarian", text: $viewModel.tagsText)
-                .accessibilityLabel("Recipe tags")
-                .accessibilityHint("Enter tags separated by commas")
-        } header: {
-            Text("Tags")
-        } footer: {
-            Text("Separate tags with commas")
-        }
+        TagPickerView(
+            selectedTags: $viewModel.selectedTags,
+            tagFrequencies: tagFrequencies,
+            customTagText: $viewModel.customTagText,
+            onAddCustomTag: { viewModel.addCustomTag() }
+        )
 
         Section {
             TextField("serves 4, makes 12 cookies", text: $viewModel.yieldsText)

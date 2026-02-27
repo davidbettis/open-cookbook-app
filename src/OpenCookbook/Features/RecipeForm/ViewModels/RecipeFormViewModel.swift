@@ -181,7 +181,8 @@ class RecipeFormViewModel: Identifiable {
 
     var title: String = ""
     var descriptionText: String = ""
-    var tagsText: String = ""
+    var selectedTags: Set<String> = []
+    var customTagText: String = ""
     var yieldsText: String = ""
     var ingredients: [EditableIngredient] = [EditableIngredient()]
     var ingredientGroups: [EditableIngredientGroup] = []
@@ -402,6 +403,28 @@ class RecipeFormViewModel: Identifiable {
         }
     }
 
+    // MARK: - Tag Methods
+
+    /// Toggle a tag in/out of the selected set
+    func toggleTag(_ tag: String) {
+        let normalized = tag.lowercased()
+        if selectedTags.contains(normalized) {
+            selectedTags.remove(normalized)
+        } else {
+            selectedTags.insert(normalized)
+        }
+    }
+
+    /// Add a custom tag from customTagText, then clear the text field
+    func addCustomTag() {
+        let normalized = customTagText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        guard !normalized.isEmpty else { return }
+        selectedTags.insert(normalized)
+        customTagText = ""
+    }
+
     // MARK: - Public Methods
 
     /// Add a new empty ingredient row and return its ID
@@ -595,7 +618,7 @@ class RecipeFormViewModel: Identifiable {
 
         title = recipe.title
         descriptionText = recipe.description ?? ""
-        tagsText = recipe.tags.joined(separator: ", ")
+        selectedTags = Set(recipe.tags.map { $0.lowercased() })
         instructionGroups = parseInstructionsToGroups(recipe.instructions ?? "")
 
         // Format yields from Yield type
@@ -694,11 +717,7 @@ class RecipeFormViewModel: Identifiable {
 
     /// Build a RecipeFile from the current form state
     func buildRecipeFile() -> RecipeFile {
-        // Parse tags from comma-separated string
-        let tags = tagsText
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
+        let tags = Array(selectedTags).sorted()
 
         // Parse yields from comma-separated string into Yield type
         let yieldAmounts = yieldsText
@@ -795,7 +814,7 @@ class RecipeFormViewModel: Identifiable {
         FormState(
             title: title,
             description: descriptionText,
-            tags: tagsText,
+            tags: selectedTags,
             yields: yieldsText,
             ingredients: ingredients.map { "\($0.amount)|\($0.name)" },
             ingredientGroups: ingredientGroups.map { group in
@@ -814,7 +833,7 @@ class RecipeFormViewModel: Identifiable {
     private struct FormState: Equatable {
         let title: String
         let description: String
-        let tags: String
+        let tags: Set<String>
         let yields: String
         let ingredients: [String]
         let ingredientGroups: [IngredientGroupState]

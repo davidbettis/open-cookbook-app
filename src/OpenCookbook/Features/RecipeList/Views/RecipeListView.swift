@@ -136,6 +136,7 @@ struct RecipeListView: View {
                 RecipeFormView(
                     viewModel: RecipeFormViewModel(mode: .add),
                     recipeStore: viewModel.recipeStore,
+                    tagFrequencies: RecipeSearchService.computeTagFrequencies(from: viewModel.recipeStore.recipes),
                     onSave: { _ in viewModel.syncSearchService() }
                 )
             }
@@ -143,11 +144,15 @@ struct RecipeListView: View {
                 RecipeFormView(
                     viewModel: formVM,
                     recipeStore: viewModel.recipeStore,
+                    tagFrequencies: RecipeSearchService.computeTagFrequencies(from: viewModel.recipeStore.recipes),
                     onSave: { _ in viewModel.syncSearchService() }
                 )
             }
             .sheet(item: $importSource) { source in
-                ImportRecipeView(initialSource: source)
+                ImportRecipeView(
+                    initialSource: source,
+                    tagPrompt: RecipeSearchService.tagFrequencyPrompt(from: viewModel.recipeStore.recipes)
+                )
             }
             .onReceive(NotificationCenter.default.publisher(for: .importRecipeCompleted)) { notification in
                 guard let markdown = notification.userInfo?["markdown"] as? String else { return }

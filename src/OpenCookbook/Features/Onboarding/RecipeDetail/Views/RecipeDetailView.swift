@@ -104,6 +104,7 @@ struct RecipeDetailView: View {
                 RecipeFormView(
                     viewModel: RecipeFormViewModel(mode: .edit(fullRecipeFile)),
                     recipeStore: store,
+                    tagFrequencies: RecipeSearchService.computeTagFrequencies(from: store.recipes),
                     onSave: { savedRecipeFile in
                         currentRecipeFile = savedRecipeFile
                         Task {
