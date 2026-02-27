@@ -277,6 +277,11 @@ class RecipeFormViewModel: Identifiable {
         validationErrors.contains { $0.field == "instructionGroupTitle" }
     }
 
+    /// Check if any instruction group text contains ingredient amounts that won't scale
+    var instructionsContainAmounts: Bool {
+        instructionGroups.contains { InstructionAmountDetector.containsAmounts($0.text) }
+    }
+
     /// Check if markdown has unsaved changes
     var hasUnsavedMarkdownChanges: Bool {
         guard let initial = initialMarkdown else { return false }

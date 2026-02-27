@@ -33,6 +33,7 @@ struct RecipeFormView: View {
     @State private var showConflictAlert = false
     @State private var groupToDelete: EditableIngredientGroup?
     @State private var instructionGroupToDeleteId: UUID?
+    @State private var amountWarningDismissed = false
     @FocusState private var focusedIngredientField: IngredientField?
 
     // MARK: - Initialization
@@ -347,6 +348,40 @@ struct RecipeFormView: View {
     @ViewBuilder
     private var instructionsSections: some View {
         @Bindable var viewModel = viewModel
+
+        if viewModel.instructionsContainAmounts && !amountWarningDismissed {
+            Section {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                        .accessibilityHidden(true)
+
+                    Text("Instructions contain ingredient amounts that won't scale with portion adjustments. Consider referencing ingredients by name instead.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Button {
+                        amountWarningDismissed = true
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Dismiss warning")
+                }
+                .padding(10)
+                .background(Color.orange.opacity(0.1))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(Color.orange.opacity(0.3), lineWidth: 1)
+                )
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+            }
+        }
 
         // Ungrouped instructions (always first)
         Section("Instructions") {
