@@ -5,6 +5,8 @@
 - Add structured tag picker with category sections, search, usage counts, and custom tag support
 - Add bulk tag editing: select multiple recipes and add or remove tags at once
 - Add local default folder option during onboarding
+- Add warning banner on Instructions tab when ingredient amounts are detected that won't scale with portion adjustments
+- Use slash fractions instead of unicode fractions in AI recipe import
 
 1.0.2
 - Add the ability to import a recipe from a website
