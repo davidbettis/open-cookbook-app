@@ -343,6 +343,86 @@ class RecipeStore {
         }
     }
 
+    // MARK: - Bulk Operations
+
+    /// Add tags to multiple recipes at once
+    /// - Parameters:
+    ///   - tags: Tags to add
+    ///   - recipeIDs: IDs of recipes to update
+    /// - Returns: Result with success and failure counts
+    func bulkAddTags(_ tags: Set<String>, to recipeIDs: Set<UUID>) -> BulkOperationResult {
+        var successCount = 0
+        var failures: [(RecipeFile, Error)] = []
+
+        for id in recipeIDs {
+            guard let index = recipes.firstIndex(where: { $0.id == id }) else { continue }
+            let recipeFile = recipes[index]
+
+            do {
+                var updated = recipeFile
+                var tagSet = Set(updated.recipe.tags)
+                tagSet.formUnion(tags)
+                updated.recipe.tags = Array(tagSet).sorted()
+                updated.fileModifiedDate = Date()
+
+                try recipeFile.filePath.withSecurityScopedAccess {
+                    let markdown = serializer.serialize(updated)
+                    try markdown.write(to: recipeFile.filePath, atomically: true, encoding: .utf8)
+                }
+
+                recipes[index] = updated
+                recipeCache[recipeFile.filePath] = CachedRecipeFile(recipeFile: updated, modificationDate: Date())
+                successCount += 1
+            } catch {
+                failures.append((recipeFile, error))
+            }
+        }
+
+        withAnimation {
+            recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        }
+
+        return BulkOperationResult(successCount: successCount, failureCount: failures.count, failedRecipes: failures)
+    }
+
+    /// Remove tags from multiple recipes at once
+    /// - Parameters:
+    ///   - tags: Tags to remove
+    ///   - recipeIDs: IDs of recipes to update
+    /// - Returns: Result with success and failure counts
+    func bulkRemoveTags(_ tags: Set<String>, from recipeIDs: Set<UUID>) -> BulkOperationResult {
+        var successCount = 0
+        var failures: [(RecipeFile, Error)] = []
+
+        for id in recipeIDs {
+            guard let index = recipes.firstIndex(where: { $0.id == id }) else { continue }
+            let recipeFile = recipes[index]
+
+            do {
+                var updated = recipeFile
+                updated.recipe.tags = recipeFile.recipe.tags.filter { !tags.contains($0) }
+                updated.fileModifiedDate = Date()
+
+                try recipeFile.filePath.withSecurityScopedAccess {
+                    let markdown = serializer.serialize(updated)
+                    try markdown.write(to: recipeFile.filePath, atomically: true, encoding: .utf8)
+                }
+
+                recipes[index] = updated
+                recipeCache[recipeFile.filePath] = CachedRecipeFile(recipeFile: updated, modificationDate: Date())
+                successCount += 1
+            } catch {
+                failures.append((recipeFile, error))
+            }
+        }
+
+        withAnimation {
+            recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        }
+
+        return BulkOperationResult(successCount: successCount, failureCount: failures.count, failedRecipes: failures)
+    }
+
     // MARK: - Private Methods
 
     /// Parse all recipe files from the monitored folder

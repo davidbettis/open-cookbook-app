@@ -55,6 +55,13 @@ enum RecipeWriteError: LocalizedError {
     }
 }
 
+/// Result of a bulk tag operation
+struct BulkOperationResult {
+    let successCount: Int
+    let failureCount: Int
+    let failedRecipes: [(RecipeFile, Error)]
+}
+
 /// Errors that can occur when deleting recipe files
 enum RecipeDeleteError: LocalizedError {
     case fileNotFound

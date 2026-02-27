@@ -29,6 +29,65 @@ class RecipeListViewModel {
         return recipeStore.recipes
     }
 
+    // MARK: - Edit Mode
+
+    /// Whether bulk edit mode is active
+    var isEditMode = false
+
+    /// IDs of selected recipes in edit mode
+    var selectedRecipeIDs: Set<UUID> = []
+
+    /// Number of currently selected recipes
+    var selectedCount: Int { selectedRecipeIDs.count }
+
+    /// Toggle selection of a recipe
+    func toggleSelection(_ recipeID: UUID) {
+        if selectedRecipeIDs.contains(recipeID) {
+            selectedRecipeIDs.remove(recipeID)
+        } else {
+            selectedRecipeIDs.insert(recipeID)
+        }
+    }
+
+    /// Enter edit mode
+    func enterEditMode() {
+        isEditMode = true
+        selectedRecipeIDs = []
+    }
+
+    /// Exit edit mode and clear selection
+    func exitEditMode() {
+        isEditMode = false
+        selectedRecipeIDs = []
+    }
+
+    /// Get tags present on selected recipes with per-tag counts
+    func tagsOnSelectedRecipes() -> [(tag: String, count: Int)] {
+        var tagCounts: [String: Int] = [:]
+        for id in selectedRecipeIDs {
+            guard let recipe = recipeStore.recipes.first(where: { $0.id == id }) else { continue }
+            for tag in recipe.tags {
+                tagCounts[tag, default: 0] += 1
+            }
+        }
+        return tagCounts.map { (tag: $0.key, count: $0.value) }
+            .sorted { $0.count > $1.count || ($0.count == $1.count && $0.tag < $1.tag) }
+    }
+
+    /// Bulk add tags to selected recipes
+    func bulkAddTags(_ tags: Set<String>) -> BulkOperationResult {
+        let result = recipeStore.bulkAddTags(tags, to: selectedRecipeIDs)
+        syncSearchService()
+        return result
+    }
+
+    /// Bulk remove tags from selected recipes
+    func bulkRemoveTags(_ tags: Set<String>) -> BulkOperationResult {
+        let result = recipeStore.bulkRemoveTags(tags, from: selectedRecipeIDs)
+        syncSearchService()
+        return result
+    }
+
     // MARK: - Initialization
 
     init(recipeStore: RecipeStore) {
@@ -73,6 +132,13 @@ struct RecipeListView: View {
     @State private var deleteError: Error?
     @State private var showDeleteError = false
 
+    // Bulk edit mode state
+    @State private var showBulkAddTags = false
+    @State private var showBulkRemoveTags = false
+    @State private var showToast = false
+    @State private var toastMessage = ""
+    @State private var toastStyle: ToastStyle = .success
+
     // MARK: - Initialization
 
     init(viewModel: RecipeListViewModel) {
@@ -98,6 +164,17 @@ struct RecipeListView: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if !viewModel.recipeStore.recipes.isEmpty {
+                        Button(viewModel.isEditMode ? "Done" : "Select") {
+                            if viewModel.isEditMode {
+                                viewModel.exitEditMode()
+                            } else {
+                                viewModel.enterEditMode()
+                            }
+                        }
+                    }
+                }
                 ToolbarItem(placement: .principal) {
                     Image("AppIconSmall")
                         .resizable()
@@ -106,27 +183,29 @@ struct RecipeListView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .accessibilityLabel("Open Cookbook")
                 }
-                ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button {
-                            showAddRecipe = true
+                if !viewModel.isEditMode {
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            Button {
+                                showAddRecipe = true
+                            } label: {
+                                Label("New Recipe", systemImage: "square.and.pencil")
+                            }
+                            Button {
+                                importSource = .website
+                            } label: {
+                                Label("Import from Website", systemImage: "globe")
+                            }
+                            Button {
+                                importSource = .photo
+                            } label: {
+                                Label("Import from Photo", systemImage: "camera")
+                            }
                         } label: {
-                            Label("New Recipe", systemImage: "square.and.pencil")
+                            Image(systemName: "plus")
                         }
-                        Button {
-                            importSource = .website
-                        } label: {
-                            Label("Import from Website", systemImage: "globe")
-                        }
-                        Button {
-                            importSource = .photo
-                        } label: {
-                            Label("Import from Photo", systemImage: "camera")
-                        }
-                    } label: {
-                        Image(systemName: "plus")
+                        .accessibilityLabel("Add Recipe")
                     }
-                    .accessibilityLabel("Add Recipe")
                 }
             }
             .navigationDestination(for: RecipeFile.self) { recipeFile in
@@ -200,6 +279,25 @@ struct RecipeListView: View {
                     Text(error.localizedDescription)
                 }
             }
+            .sheet(isPresented: $showBulkAddTags) {
+                BulkTagAddView(
+                    selectedCount: viewModel.selectedCount,
+                    tagFrequencies: RecipeSearchService.computeTagFrequencies(from: viewModel.recipeStore.recipes),
+                    onApply: { tags in
+                        handleBulkResult(viewModel.bulkAddTags(tags), verb: "Added", tagCount: tags.count)
+                    }
+                )
+            }
+            .sheet(isPresented: $showBulkRemoveTags) {
+                BulkTagRemoveView(
+                    totalSelected: viewModel.selectedCount,
+                    tagsWithCounts: viewModel.tagsOnSelectedRecipes(),
+                    onApply: { tags in
+                        handleBulkResult(viewModel.bulkRemoveTags(tags), verb: "Removed", tagCount: tags.count)
+                    }
+                )
+            }
+            .toast(isPresented: $showToast, message: toastMessage, style: toastStyle)
             .task {
                 // Load recipes on appear
                 if let folder = folderManager.selectedFolderURL {
@@ -261,6 +359,11 @@ struct RecipeListView: View {
             } else {
                 recipeList
             }
+
+            // Bottom toolbar for edit mode
+            if viewModel.isEditMode {
+                editModeBottomBar
+            }
         }
     }
 
@@ -269,24 +372,40 @@ struct RecipeListView: View {
         List {
             // Show successfully parsed recipes
             ForEach(viewModel.displayedRecipes) { recipeFile in
-                NavigationLink(value: recipeFile) {
-                    RecipeCard(recipeFile: recipeFile)
-                }
-                .buttonStyle(.plain)
-                .listRowSeparator(.hidden)
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    Button(role: .destructive) {
-                        recipeToDelete = recipeFile
-                        showDeleteConfirmation = true
+                if viewModel.isEditMode {
+                    Button {
+                        viewModel.toggleSelection(recipeFile.id)
                     } label: {
-                        Label("Delete", systemImage: "trash")
+                        HStack(spacing: 12) {
+                            Image(systemName: viewModel.selectedRecipeIDs.contains(recipeFile.id) ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(viewModel.selectedRecipeIDs.contains(recipeFile.id) ? Color.accentColor : .secondary)
+                                .font(.title3)
+                            RecipeCard(recipeFile: recipeFile)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                } else {
+                    NavigationLink(value: recipeFile) {
+                        RecipeCard(recipeFile: recipeFile)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowSeparator(.hidden)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            recipeToDelete = recipeFile
+                            showDeleteConfirmation = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 }
             }
 
-            // Show parse errors (only when not filtering)
-            if !viewModel.searchService.hasActiveFilters {
+            // Show parse errors (only when not filtering, not in edit mode)
+            if !viewModel.searchService.hasActiveFilters && !viewModel.isEditMode {
                 ForEach(Array(viewModel.recipeStore.parseErrors.keys.sorted(by: { $0.lastPathComponent < $1.lastPathComponent })), id: \.self) { url in
                     if let error = viewModel.recipeStore.parseErrors[url] {
                         Button {
@@ -309,6 +428,30 @@ struct RecipeListView: View {
         }
     }
 
+    /// Bottom toolbar shown during edit mode
+    private var editModeBottomBar: some View {
+        VStack(spacing: 0) {
+            Divider()
+            HStack {
+                Text("\(viewModel.selectedCount) Selected")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Add Tags") {
+                    showBulkAddTags = true
+                }
+                .disabled(viewModel.selectedCount == 0)
+                Button("Remove Tags") {
+                    showBulkRemoveTags = true
+                }
+                .disabled(viewModel.selectedCount == 0)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+        }
+        .background(.bar)
+    }
+
     // MARK: - Actions
 
     /// Delete a recipe
@@ -320,6 +463,27 @@ struct RecipeListView: View {
         } catch {
             deleteError = error
             showDeleteError = true
+        }
+    }
+
+    /// Handle the result of a bulk tag operation
+    private func handleBulkResult(_ result: BulkOperationResult, verb: String, tagCount: Int) {
+        if result.failureCount == 0 {
+            toastMessage = "\(verb) \(tagCount) \(tagCount == 1 ? "tag" : "tags") \(verb == "Added" ? "to" : "from") \(result.successCount) \(result.successCount == 1 ? "recipe" : "recipes")"
+            toastStyle = .success
+            viewModel.exitEditMode()
+        } else if result.successCount > 0 {
+            toastMessage = "Updated \(result.successCount) of \(result.successCount + result.failureCount) recipes. \(result.failureCount) could not be updated."
+            toastStyle = .error
+            // Keep edit mode active with failed recipes still selected
+            let failedIDs = Set(result.failedRecipes.map { $0.0.id })
+            viewModel.selectedRecipeIDs = failedIDs
+        } else {
+            toastMessage = "Could not update any recipes."
+            toastStyle = .error
+        }
+        withAnimation {
+            showToast = true
         }
     }
 

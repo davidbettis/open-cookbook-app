@@ -25,20 +25,30 @@ struct RecipeDetailView: View {
 
     private let parser = RecipeFileParser()
 
+    /// Latest recipe from the store (reflects bulk edits immediately),
+    /// falling back to the locally-tracked copy or the navigation snapshot.
+    private var displayedRecipeFile: RecipeFile {
+        if let store = recipeStore,
+           let latest = store.recipes.first(where: { $0.id == recipeFile.id }) {
+            return latest
+        }
+        return currentRecipeFile ?? recipeFile
+    }
+
     var body: some View {
         Group {
             if let content = markdownContent {
                 if horizontalSizeClass == .regular {
                     // iPad: RecipeDetailContent handles its own scrolling
                     RecipeDetailContent(
-                        recipeFile: currentRecipeFile ?? recipeFile,
+                        recipeFile: displayedRecipeFile,
                         markdownContent: content
                     )
                 } else {
                     // iPhone: Wrap in ScrollView
                     ScrollView {
                         RecipeDetailContent(
-                            recipeFile: currentRecipeFile ?? recipeFile,
+                            recipeFile: displayedRecipeFile,
                             markdownContent: content
                         )
                     }
