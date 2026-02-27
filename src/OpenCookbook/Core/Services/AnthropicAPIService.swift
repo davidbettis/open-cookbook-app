@@ -165,7 +165,8 @@ class AnthropicAPIService {
         4. Separator: Add a horizontal rule (---)
         5. Ingredients List:
            * Each ingredient on its own line starting with a dash
-           * Italicize quantities (e.g., 2½ lb, ½ c, 1 T)
+           * Italicize quantities (e.g., *2 1/2 lb*, *1/2 c*, *1 T*)
+           * Use slash fractions (1/2, 1/4, 3/4) instead of unicode fractions
            * Follow quantity with ingredient description
            * Maintain original measurements and abbreviations
            * Do not include a heading that says "Ingredients" for this section.
