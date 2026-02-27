@@ -10,6 +10,7 @@ import SwiftUI
 /// Represents the current step in the onboarding flow
 enum OnboardingStep {
     case welcome
+    case storageSelection
     case confirmation
 }
 
@@ -27,7 +28,21 @@ final class OnboardingViewModel {
         self.folderManager = folderManager
     }
 
-    func selectFolder() {
+    func proceedToStorageSelection() {
+        currentStep = .storageSelection
+    }
+
+    func selectDefaultLocalFolder() {
+        do {
+            let url = try folderManager.createDefaultLocalFolder()
+            selectedFolderURL = url
+            currentStep = .confirmation
+        } catch {
+            errorMessage = "Could not create folder. Please check available storage and try again."
+        }
+    }
+
+    func selectCustomFolder() {
         showPicker = true
     }
 
@@ -42,7 +57,7 @@ final class OnboardingViewModel {
     }
 
     func handleCancelled() {
-        errorMessage = "Please select a folder to continue"
+        currentStep = .storageSelection
     }
 }
 
@@ -60,7 +75,13 @@ struct OnboardingView: View {
         Group {
             switch viewModel.currentStep {
             case .welcome:
-                WelcomeView(onSelectFolder: viewModel.selectFolder)
+                WelcomeView(onContinue: viewModel.proceedToStorageSelection)
+
+            case .storageSelection:
+                StorageSelectionView(
+                    onSelectLocal: viewModel.selectDefaultLocalFolder,
+                    onSelectCustom: viewModel.selectCustomFolder
+                )
 
             case .confirmation:
                 if let url = viewModel.selectedFolderURL {

@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct WelcomeView: View {
-    let onSelectFolder: () -> Void
+    let onContinue: () -> Void
 
     var body: some View {
         VStack(spacing: 24) {
@@ -24,7 +24,7 @@ struct WelcomeView: View {
                 .bold()
                 .multilineTextAlignment(.center)
 
-            Text("Open Cookbook stores your recipes on a folder on your device or in iCloud drive. Your data stays under your control. ")
+            Text("Open Cookbook stores your recipes in a folder on your device or in iCloud Drive. Your data stays under your control.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -32,22 +32,22 @@ struct WelcomeView: View {
 
             Spacer()
 
-            Button(action: onSelectFolder) {
-                Text("Select Folder")
+            Button(action: onContinue) {
+                Text("Get Started")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .padding(.horizontal, 32)
             .padding(.bottom, 48)
-            .accessibilityLabel("Select folder button")
-            .accessibilityHint("Opens folder picker to choose where recipes will be stored")
+            .accessibilityLabel("Get started button")
+            .accessibilityHint("Proceeds to storage selection")
         }
     }
 }
 
 #Preview {
-    WelcomeView(onSelectFolder: {
-        print("Select folder tapped")
+    WelcomeView(onContinue: {
+        print("Get started tapped")
     })
 }

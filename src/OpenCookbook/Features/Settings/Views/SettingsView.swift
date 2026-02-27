@@ -141,6 +141,7 @@ struct SettingsView: View {
             .sheet(isPresented: $showFolderPicker) {
                 FolderPicker(
                     selectedURL: $selectedURL,
+                    initialDirectory: folderManager.selectedFolderURL,
                     onSelect: { url in
                         try? folderManager.saveFolder(url)
                         showFolderPicker = false

@@ -51,7 +51,41 @@ struct FolderManagerTests {
         #expect(UserDefaults.standard.data(forKey: "selectedFolderBookmark") == nil)
     }
 
-    // TODO: Add tests for saveFolder() once implemented (Task 2.1)
-    // TODO: Add tests for loadSavedFolder() once implemented (Task 2.1)
-    // TODO: Add tests for selectFolder() once implemented (Task 2.2)
+    @Test func createDefaultLocalFolderReturnsURLWithCorrectLastComponent() async throws {
+        UserDefaults.standard.removeObject(forKey: "selectedFolderBookmark")
+        let manager = FolderManager()
+
+        let url = try manager.createDefaultLocalFolder()
+
+        #expect(url.lastPathComponent == "Recipes")
+        #expect(FileManager.default.fileExists(atPath: url.path))
+
+        // Cleanup
+        manager.clearSavedFolder()
+    }
+
+    @Test func createDefaultLocalFolderIsIdempotent() async throws {
+        UserDefaults.standard.removeObject(forKey: "selectedFolderBookmark")
+        let manager = FolderManager()
+
+        let url1 = try manager.createDefaultLocalFolder()
+        let url2 = try manager.createDefaultLocalFolder()
+
+        #expect(url1 == url2)
+
+        // Cleanup
+        manager.clearSavedFolder()
+    }
+
+    @Test func createDefaultiCloudFolderThrowsWhenICloudUnavailable() async throws {
+        UserDefaults.standard.removeObject(forKey: "selectedFolderBookmark")
+        let manager = FolderManager()
+
+        // In the test/simulator environment, iCloud is typically unavailable
+        if !manager.checkiCloudAvailability() {
+            #expect(throws: FolderError.iCloudUnavailable) {
+                try manager.createDefaultiCloudFolder()
+            }
+        }
+    }
 }

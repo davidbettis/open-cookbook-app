@@ -2,6 +2,7 @@
 
 **Priority**: P0 (Must Have)
 **Feature ID**: F006
+**Related Specs**: [Tag Management](tag-management.md)
 
 ## Description
 Edit all aspects of an existing recipe, preserving RecipeMD format. Changes save back to the original .md file in iCloud.
@@ -254,7 +255,8 @@ The segmented control is **not inside the scroll view** — it is pinned at the 
 - Parse existing recipe into form fields
 - Ingredient list shows all existing ingredients with amounts
 - Ingredient groups preserved with their titles and ingredient lists
-- Tags and yields parsed and displayed in text fields
+- Tags pre-selected in TagPickerView based on existing recipe tags (see [Tag Management](tag-management.md))
+- Yields parsed and displayed in text field
 - Instructions parsed for headings and loaded into instruction group sections
 - If instructions contain no headings, all text appears in the ungrouped section
 
@@ -273,9 +275,10 @@ The segmented control is **not inside the scroll view** — it is pinned at the 
 │ │                                 │ │   Tap [↗] to expand full-screen
 │ └─────────────────────────────────┘ │
 │                                     │
-│ Tags                                │
+│ Tags (see Tag Management spec)      │
 │ ┌─────────────────────────────────┐ │
-│ │ dessert, quick, vegetarian      │ │
+│ │ ☑ italian  ☑ chicken  ☑ baked  │ │ ← TagPickerView (multi-select
+│ │ ☐ mexican  ☐ seafood  ...      │ │   chips grouped by category)
 │ └─────────────────────────────────┘ │
 │                                     │
 │ Yields                              │

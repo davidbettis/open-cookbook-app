@@ -2,6 +2,7 @@
 
 **Priority**: P0 (Must Have)
 **Feature ID**: F005
+**Related Specs**: [Tag Management](tag-management.md)
 
 ## Description
 Create new recipes using a form-based UI that maps to RecipeMD format structure. Save as .md file in selected iCloud folder.
@@ -108,7 +109,7 @@ Ingredient groups allow users to organize ingredients under titled sections (e.g
 - Ingredients: At least 1 required (across ungrouped + all groups)
 - Ingredient group titles: Required, non-empty when a group exists
 - File name: Slug from title, ensure uniqueness
-- Tags: Optional, comma-separated
+- Tags: Optional, selected via tag picker
 - Yields: Optional, comma-separated
 - Description: Optional
 - Instructions: Optional
@@ -171,9 +172,10 @@ The segmented control is **not inside the scroll view** — it is pinned at the 
 │ │                                 │ │   Tap [↗] to expand full-screen
 │ └─────────────────────────────────┘ │
 │                                     │
-│ Tags                                │
+│ Tags (see Tag Management spec)      │
 │ ┌─────────────────────────────────┐ │
-│ │ dessert, quick, vegetarian      │ │
+│ │ ☑ italian  ☑ chicken  ☑ baked  │ │ ← TagPickerView (multi-select
+│ │ ☐ mexican  ☐ seafood  ...      │ │   chips grouped by category)
 │ └─────────────────────────────────┘ │
 │                                     │
 │ Yields                              │
@@ -290,7 +292,7 @@ Multi-line text fields (description, all instruction text areas) use a **fixed-h
 ### Field Specifications
 - **Title**: Single-line text field, required indicator (*)
 - **Description**: Multi-line text field, fixed height (3-4 lines) with expand button, optional
-- **Tags**: Single-line, comma-separated, placeholder: "dessert, quick, vegetarian"
+- **Tags**: TagPickerView — multi-select chips grouped by category (built-in vocabulary + custom tags). See [Tag Management](tag-management.md) for full design.
 - **Yields**: Single-line, comma-separated, placeholder: "serves 4, makes 12 cookies"
 - **Ingredients**: Dynamic list
   - Amount field (left, narrow, optional)

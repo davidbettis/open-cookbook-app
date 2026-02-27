@@ -14,6 +14,7 @@ enum FolderError: LocalizedError {
     case permissionDenied
     case iCloudUnavailable
     case invalidBookmark
+    case folderCreationFailed
 
     var errorDescription: String? {
         switch self {
@@ -25,6 +26,8 @@ enum FolderError: LocalizedError {
             return "iCloud Drive is not available. Please enable iCloud in Settings."
         case .invalidBookmark:
             return "The saved folder reference is invalid. Please select a folder again."
+        case .folderCreationFailed:
+            return "Could not create folder. Please check available storage and try again."
         }
     }
 }
@@ -252,9 +255,51 @@ final class FolderManager {
         }
     }
 
+    /// Creates a default local folder at Documents/OpenCookbook and persists the selection
+    /// - Returns: The URL of the created folder
+    /// - Throws: `FolderError.folderCreationFailed` if directory creation fails
+    func createDefaultLocalFolder() throws -> URL {
+        guard let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            throw FolderError.folderCreationFailed
+        }
+        let folderURL = documentsURL.appendingPathComponent("Recipes")
+        do {
+            try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
+        } catch {
+            throw FolderError.folderCreationFailed
+        }
+        try saveFolder(folderURL)
+        return folderURL
+    }
+
+    /// Creates a default iCloud folder at iCloud Drive/Documents/OpenCookbook and persists the selection
+    /// - Returns: The URL of the created folder
+    /// - Throws: `FolderError.iCloudUnavailable` if iCloud is not available,
+    ///           `FolderError.folderCreationFailed` if directory creation fails
+    func createDefaultiCloudFolder() throws -> URL {
+        guard checkiCloudAvailability() else {
+            throw FolderError.iCloudUnavailable
+        }
+        guard let containerURL = FileManager.default.url(forUbiquityContainerIdentifier: nil)?.appendingPathComponent("Documents/Recipes") else {
+            throw FolderError.folderCreationFailed
+        }
+        do {
+            try FileManager.default.createDirectory(at: containerURL, withIntermediateDirectories: true)
+        } catch {
+            throw FolderError.folderCreationFailed
+        }
+        try saveFolder(containerURL)
+        return containerURL
+    }
+
     /// Checks if iCloud Drive is available
     /// - Returns: True if iCloud is available and user is signed in
     func checkiCloudAvailability() -> Bool {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--force-icloud-available") {
+            return true
+        }
+        #endif
         return FileManager.default.ubiquityIdentityToken != nil
     }
 }
