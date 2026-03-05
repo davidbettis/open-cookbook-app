@@ -8,6 +8,11 @@
 import MarkdownUI
 import SwiftUI
 import RecipeMD
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 struct RecipeDetailView: View {
     let recipeFile: RecipeFile
@@ -22,8 +27,11 @@ struct RecipeDetailView: View {
     @State private var deleteError: Error?
     @State private var showDeleteError = false
     @State private var recipeToEdit: RecipeFile?
+    @State private var showCopiedToast = false
+    @State private var showShareSheet = false
 
     private let parser = RecipeFileParser()
+    private let serializer = RecipeFileSerializer()
 
     /// Latest recipe from the store (reflects bulk edits immediately),
     /// falling back to the locally-tracked copy or the navigation snapshot.
@@ -78,8 +86,10 @@ struct RecipeDetailView: View {
             }
 
             ToolbarItemGroup(placement: .primaryAction) {
-                // Share button - shares the file like Files app
-                ShareLink(item: currentRecipeFile?.filePath ?? recipeFile.filePath) {
+                // Share button - shares recipe as .recipe.md file attachment
+                Button {
+                    showShareSheet = true
+                } label: {
                     Image(systemName: "square.and.arrow.up")
                 }
                 .accessibilityLabel("Share Recipe")
@@ -94,9 +104,15 @@ struct RecipeDetailView: View {
                     .accessibilityLabel("Edit Recipe")
                 }
 
-                // More menu (with delete)
+                // More menu
                 if recipeStore != nil {
                     Menu {
+                        Button {
+                            copyRecipeToClipboard()
+                        } label: {
+                            Label("Copy Recipe", systemImage: "doc.on.doc")
+                        }
+
                         Button(role: .destructive) {
                             showDeleteConfirmation = true
                         } label: {
@@ -145,6 +161,15 @@ struct RecipeDetailView: View {
                 Text(error.localizedDescription)
             }
         }
+        .sheet(isPresented: $showShareSheet) {
+            #if canImport(UIKit)
+            RecipeShareSheet(
+                title: displayedRecipeFile.title,
+                markdown: serializer.serialize(displayedRecipeFile)
+            )
+            .presentationDetents([.medium, .large])
+            #endif
+        }
         .task(id: recipeFile.id) {
             // Reset state when recipe changes
             markdownContent = nil
@@ -152,6 +177,23 @@ struct RecipeDetailView: View {
             currentRecipeFile = recipeFile
             await loadRecipeContent()
         }
+        .overlay(alignment: .bottom) {
+            if showCopiedToast {
+                Text("Recipe copied")
+                    .font(.subheadline.weight(.medium))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(.bottom, 32)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .onAppear {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            withAnimation { showCopiedToast = false }
+                        }
+                    }
+            }
+        }
+        .animation(.easeInOut, value: showCopiedToast)
     }
 
     // MARK: - Content Loading
@@ -184,6 +226,19 @@ struct RecipeDetailView: View {
         recipeToEdit = fileURL.withSecurityScopedAccess {
             try? parser.parse(from: fileURL)
         } ?? currentRecipeFile ?? recipeFile
+    }
+
+    // MARK: - Copy
+
+    private func copyRecipeToClipboard() {
+        let markdown = serializer.serialize(displayedRecipeFile)
+        #if canImport(UIKit)
+        UIPasteboard.general.string = markdown
+        #elseif canImport(AppKit)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(markdown, forType: .string)
+        #endif
+        showCopiedToast = true
     }
 
     // MARK: - Delete

@@ -7,6 +7,11 @@
 
 import SwiftUI
 
+extension Notification.Name {
+    /// Posted when recipes are added/changed outside the RecipeStore (e.g. file import)
+    static let recipesDidChange = Notification.Name("recipesDidChange")
+}
+
 /// Platform-adaptive container that shows appropriate view based on device
 struct RecipeLibraryContainerView: View {
 
@@ -36,6 +41,9 @@ struct RecipeLibraryContainerView: View {
             if let folderURL = folderManager.selectedFolderURL {
                 recipeStore.loadRecipes(from: folderURL)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .recipesDidChange)) { _ in
+            recipeStore.refreshRecipes()
         }
     }
 }

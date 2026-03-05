@@ -22,6 +22,8 @@ struct RecipeListSplitView: View {
     @State private var importSource: ImportRecipeViewModel.ImportSource?
     @State private var importedFormViewModel: RecipeFormViewModel?
     @State private var pendingImportMarkdown: String?
+    @State private var clipboardError: String?
+    @State private var showClipboardError = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @AppStorage("isLibraryExpanded") private var isLibraryExpanded = false
 
@@ -64,6 +66,12 @@ struct RecipeListSplitView: View {
                                 Label("New Recipe", systemImage: "square.and.pencil")
                             }
                             Button {
+                                importRecipeFromClipboard()
+                            } label: {
+                                Label("Paste Recipe", systemImage: "doc.on.clipboard")
+                            }
+                            .disabled(!clipboardHasText)
+                            Button {
                                 importSource = .website
                             } label: {
                                 Label("Import from Website", systemImage: "globe")
@@ -90,6 +98,13 @@ struct RecipeListSplitView: View {
         } message: { error in
             Text(error.1.localizedDescription)
         }
+        .alert("Paste Recipe", isPresented: $showClipboardError) {
+            Button("OK") {}
+        } message: {
+            if let error = clipboardError {
+                Text(error)
+            }
+        }
         .task {
             // Load recipes on appear
             if let folder = folderManager.selectedFolderURL {
@@ -98,6 +113,12 @@ struct RecipeListSplitView: View {
         }
         .onChange(of: viewModel.recipeStore.recipes) { _, _ in
             viewModel.syncSearchService()
+        }
+        .onChange(of: folderManager.pendingImportMarkdown) { _, markdown in
+            if let markdown {
+                folderManager.pendingImportMarkdown = nil
+                handleImportedRecipe(markdown)
+            }
         }
         .onChange(of: selectedRecipeFile) { _, newValue in
             if newValue != nil {
@@ -149,6 +170,27 @@ struct RecipeListSplitView: View {
             if isLibraryExpanded {
                 columnVisibility = .all
             }
+        }
+    }
+
+    /// Whether the clipboard currently contains text
+    private var clipboardHasText: Bool {
+        UIPasteboard.general.hasStrings
+    }
+
+    /// Import a recipe from the clipboard
+    private func importRecipeFromClipboard() {
+        guard let text = UIPasteboard.general.string, !text.isEmpty else {
+            clipboardError = "Nothing on the clipboard."
+            showClipboardError = true
+            return
+        }
+        do {
+            let incoming = try IncomingRecipeHandler.handleIncomingMarkdown(text)
+            handleImportedRecipe(incoming.markdown)
+        } catch {
+            clipboardError = "The clipboard doesn't appear to contain a recipe."
+            showClipboardError = true
         }
     }
 

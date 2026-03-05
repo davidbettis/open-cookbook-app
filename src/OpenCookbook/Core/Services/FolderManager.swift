@@ -41,6 +41,10 @@ final class FolderManager {
     /// The currently selected folder URL
     var selectedFolderURL: URL?
 
+    /// Pending recipe markdown from an incoming file (onOpenURL).
+    /// Set by the app entry point; consumed by the recipe list views.
+    var pendingImportMarkdown: String?
+
     /// A user-friendly description of the selected folder location
     var selectedFolderDisplayName: String? {
         guard let url = selectedFolderURL else { return nil }

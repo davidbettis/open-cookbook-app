@@ -1,5 +1,13 @@
 # Release History
 
+1.0.4
+- Update tag vocabulary: add baking category (cake, cookies, pie), add southern/bbq, simplify cuisine to broad flavor profiles
+- Add recipe sharing: share recipes via iMessage (as readable text), AirDrop, or email (as .recipemd file attachment)
+- Add "Copy Recipe" option in recipe detail overflow menu
+- Add "Paste Recipe" option in the + menu to import a recipe from the clipboard
+- Register .recipemd file type so "Open in Open Cookbook" appears when receiving recipe files
+- Add import preview with edit form when opening shared recipes
+
 1.0.3
 - Add curated tag vocabulary with categories (cuisine, meal, method, diet, protein) and AI-biased suggestions based on usage frequency
 - Add structured tag picker with category sections, search, usage counts, and custom tag support
