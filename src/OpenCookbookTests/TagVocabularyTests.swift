@@ -12,9 +12,9 @@ import Testing
 @Suite("TagVocabulary")
 struct TagVocabularyTests {
 
-    @Test("All built-in tags total 43")
+    @Test("All built-in tags total 38")
     func allBuiltInTagsCount() {
-        #expect(TagVocabulary.allBuiltInTags.count == 43)
+        #expect(TagVocabulary.allBuiltInTags.count == 38)
     }
 
     @Test("isBuiltIn returns true for known tags")
@@ -42,9 +42,10 @@ struct TagVocabularyTests {
     func categoryReturnsCorrectCategory() {
         #expect(TagVocabulary.category(for: "italian") == .cuisine)
         #expect(TagVocabulary.category(for: "breakfast") == .meal)
-        #expect(TagVocabulary.category(for: "grilled") == .method)
+        #expect(TagVocabulary.category(for: "bbq") == .method)
         #expect(TagVocabulary.category(for: "vegan") == .diet)
         #expect(TagVocabulary.category(for: "chicken") == .protein)
+        #expect(TagVocabulary.category(for: "cake") == .baking)
     }
 
     @Test("category returns nil for custom tags")
@@ -55,11 +56,12 @@ struct TagVocabularyTests {
 
     @Test("Each category has expected tag count")
     func categoriesHaveExpectedCounts() {
-        #expect(TagVocabulary.Category.cuisine.tags.count == 15)
+        #expect(TagVocabulary.Category.cuisine.tags.count == 8)
         #expect(TagVocabulary.Category.meal.tags.count == 7)
-        #expect(TagVocabulary.Category.method.tags.count == 8)
+        #expect(TagVocabulary.Category.method.tags.count == 7)
         #expect(TagVocabulary.Category.diet.tags.count == 4)
         #expect(TagVocabulary.Category.protein.tags.count == 9)
+        #expect(TagVocabulary.Category.baking.tags.count == 3)
     }
 
     @Test("No duplicate tags across categories")

@@ -14,6 +14,7 @@ struct TagVocabulary {
         case method
         case diet
         case protein
+        case baking
 
         var id: String { rawValue }
 
@@ -21,20 +22,24 @@ struct TagVocabulary {
 
         var tags: [String] {
             switch self {
-            case .cuisine:
+	    // Intent here is not to exhaustively categorize every nation or
+	    // regional cuisine, but provide over-arching ingredient/flavor
+	    // guidance.  Note multiple cuisine tags can be selected.
+	    case .cuisine:
                 return [
-                    "american", "asian", "chinese", "french", "greek", "indian",
-                    "italian", "japanese", "korean", "mediterranean",
-                    "mexican", "middle-eastern", "southern", "thai", "vietnamese"
+		    "american", "asian", "french", "indian", "italian",
+                    "mexican", "middle-eastern", "southern"
                 ]
             case .meal:
                 return [
                     "appetizer", "main", "snack", "dessert", "baking",
                     "breakfast", "brunch"
                 ]
+	    // Intent here is not to exhaustively categorize every method, but
+	    // highlight less typical ones.
             case .method:
                 return [
-                    "oven", "grilled", "fried", "slow-cooker", "instant-pot",
+                    "bbq", "fried", "slow-cooker", "instant-pot",
                     "one-pot", "no-cook", "stir-fry"
                 ]
             case .diet:
@@ -44,6 +49,8 @@ struct TagVocabulary {
                     "chicken", "beef", "pork", "lamb", "seafood",
                     "fish", "shrimp", "tofu", "eggs"
                 ]
+            case .baking:
+                return ["cake", "cookies", "pie"]
             }
         }
     }
