@@ -35,10 +35,15 @@ class ImportRecipeViewModel {
 
     var source: ImportSource = .website
     var urlText: String = ""
-    var selectedImageData: Data? = nil
-    var selectedImageMediaType: String = "image/jpeg"
+    var selectedImages: [(data: Data, mediaType: String)] = []
     var state: ImportState = .idle
     var tagPrompt: String = ""
+
+    static let maxPhotos = 5
+
+    var canAddMorePhotos: Bool {
+        selectedImages.count < Self.maxPhotos
+    }
 
     @ObservationIgnored
     @AppStorage("claudeModel") private var claudeModelRawValue: String = AnthropicAPIService.ClaudeModel.sonnet.rawValue
@@ -51,8 +56,11 @@ class ImportRecipeViewModel {
     var statusMessage: String {
         switch state {
         case .extractingRecipe:
-            return source == .website
-                ? "Extracting recipe with Claude..."
+            if source == .website {
+                return "Extracting recipe with Claude..."
+            }
+            return selectedImages.count > 1
+                ? "Extracting recipe from \(selectedImages.count) photos..."
                 : "Extracting recipe from photo..."
         default: return ""
         }
@@ -61,6 +69,20 @@ class ImportRecipeViewModel {
     var hasAPIKey: Bool {
         guard let key = try? KeychainService.read(key: "anthropic-api-key") else { return false }
         return !key.isEmpty
+    }
+
+    #if canImport(UIKit)
+    func addImage(_ image: UIImage) {
+        guard canAddMorePhotos else { return }
+        if let data = Self.resizeImageIfNeeded(image) {
+            selectedImages.append((data: data, mediaType: "image/jpeg"))
+        }
+    }
+    #endif
+
+    func removeImage(at index: Int) {
+        guard selectedImages.indices.contains(index) else { return }
+        selectedImages.remove(at: index)
     }
 
     func importRecipe() async {
@@ -132,7 +154,7 @@ class ImportRecipeViewModel {
     // MARK: - Photo Import
 
     private func importFromPhoto() async {
-        guard let imageData = selectedImageData else {
+        guard !selectedImages.isEmpty else {
             state = .error("No photo selected.")
             return
         }
@@ -145,12 +167,12 @@ class ImportRecipeViewModel {
             let model = AnthropicAPIService.ClaudeModel(rawValue: claudeModelRawValue) ?? .sonnet
 
             state = .extractingRecipe
-            logger.debug("Importing recipe from photo (\(imageData.count) bytes) using model \(model.rawValue)")
+            let totalBytes = selectedImages.reduce(0) { $0 + $1.data.count }
+            logger.debug("Importing recipe from \(self.selectedImages.count) photo(s) (\(totalBytes) bytes) using model \(model.rawValue)")
 
             let service = AnthropicAPIService()
-            let rawMarkdown = try await service.extractRecipeFromImage(
-                imageData: imageData,
-                mediaType: selectedImageMediaType,
+            let rawMarkdown = try await service.extractRecipeFromImages(
+                images: selectedImages,
                 apiKey: apiKey,
                 model: model,
                 tagPrompt: tagPrompt

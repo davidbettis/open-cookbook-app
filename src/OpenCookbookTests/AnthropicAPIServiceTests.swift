@@ -82,8 +82,23 @@ struct AnthropicAPIServiceTests {
         #expect(prompt.contains("NOT_A_RECIPE"))
     }
 
-    @Test("Photo prompt has photo-specific preamble")
-    func photoPromptPreamble() {
+    @Test("Single photo prompt has single-image preamble")
+    func singlePhotoPromptPreamble() {
+        let prompt = AnthropicAPIService.buildPhotoPrompt(imageCount: 1)
+        #expect(prompt.contains("Extract the recipe from this photo"))
+        #expect(!prompt.contains("multi-page"))
+    }
+
+    @Test("Multi photo prompt has multi-image preamble")
+    func multiPhotoPromptPreamble() {
+        let prompt = AnthropicAPIService.buildPhotoPrompt(imageCount: 3)
+        #expect(prompt.contains("multi-page cookbook spread"))
+        #expect(prompt.contains("Combine them into a single complete recipe"))
+        #expect(!prompt.contains("Extract the recipe from this photo"))
+    }
+
+    @Test("Photo prompt defaults to single image")
+    func photoPromptDefaultsSingle() {
         let prompt = AnthropicAPIService.buildPhotoPrompt()
         #expect(prompt.contains("Extract the recipe from this photo"))
     }

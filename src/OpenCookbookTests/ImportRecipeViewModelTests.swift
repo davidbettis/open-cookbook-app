@@ -152,12 +152,26 @@ struct ImportRecipeViewModelTests {
         #expect(vm.source == .website)
     }
 
-    @Test("Photo status message when extracting")
+    @Test("Photo status message when extracting with one photo")
     func photoStatusMessage() {
         let vm = ImportRecipeViewModel()
         vm.source = .photo
+        vm.selectedImages = [(data: Data([0xFF]), mediaType: "image/jpeg")]
         vm.state = .extractingRecipe
         #expect(vm.statusMessage == "Extracting recipe from photo...")
+    }
+
+    @Test("Photo status message when extracting with multiple photos")
+    func photoStatusMessageMultiple() {
+        let vm = ImportRecipeViewModel()
+        vm.source = .photo
+        vm.selectedImages = [
+            (data: Data([0xFF]), mediaType: "image/jpeg"),
+            (data: Data([0xFF]), mediaType: "image/jpeg"),
+            (data: Data([0xFF]), mediaType: "image/jpeg"),
+        ]
+        vm.state = .extractingRecipe
+        #expect(vm.statusMessage == "Extracting recipe from 3 photos...")
     }
 
     @Test("Website status message when extracting")
@@ -172,7 +186,7 @@ struct ImportRecipeViewModelTests {
     func importNoPhoto() async {
         let vm = ImportRecipeViewModel()
         vm.source = .photo
-        vm.selectedImageData = nil
+        vm.selectedImages = []
         await vm.importRecipe()
         if case .error(let message) = vm.state {
             #expect(message == "No photo selected.")
@@ -189,9 +203,59 @@ struct ImportRecipeViewModelTests {
         #expect(cases.contains(.photo))
     }
 
-    @Test("Selected image data starts nil")
-    func selectedImageDataNil() {
+    @Test("Selected images starts empty")
+    func selectedImagesEmpty() {
         let vm = ImportRecipeViewModel()
-        #expect(vm.selectedImageData == nil)
+        #expect(vm.selectedImages.isEmpty)
+    }
+
+    // MARK: - Multi-Photo Tests
+
+    @Test("canAddMorePhotos true when below limit")
+    func canAddMorePhotosBelowLimit() {
+        let vm = ImportRecipeViewModel()
+        #expect(vm.canAddMorePhotos == true)
+
+        vm.selectedImages = [
+            (data: Data([0xFF]), mediaType: "image/jpeg"),
+            (data: Data([0xFF]), mediaType: "image/jpeg"),
+        ]
+        #expect(vm.canAddMorePhotos == true)
+    }
+
+    @Test("canAddMorePhotos false at limit")
+    func canAddMorePhotosAtLimit() {
+        let vm = ImportRecipeViewModel()
+        vm.selectedImages = (0..<ImportRecipeViewModel.maxPhotos).map { _ in
+            (data: Data([0xFF]), mediaType: "image/jpeg")
+        }
+        #expect(vm.canAddMorePhotos == false)
+    }
+
+    @Test("removeImage removes correct index")
+    func removeImageAtIndex() {
+        let vm = ImportRecipeViewModel()
+        vm.selectedImages = [
+            (data: Data([0x01]), mediaType: "image/jpeg"),
+            (data: Data([0x02]), mediaType: "image/jpeg"),
+            (data: Data([0x03]), mediaType: "image/jpeg"),
+        ]
+        vm.removeImage(at: 1)
+        #expect(vm.selectedImages.count == 2)
+        #expect(vm.selectedImages[0].data == Data([0x01]))
+        #expect(vm.selectedImages[1].data == Data([0x03]))
+    }
+
+    @Test("removeImage with invalid index is safe")
+    func removeImageInvalidIndex() {
+        let vm = ImportRecipeViewModel()
+        vm.selectedImages = [(data: Data([0x01]), mediaType: "image/jpeg")]
+        vm.removeImage(at: 5)
+        #expect(vm.selectedImages.count == 1)
+    }
+
+    @Test("maxPhotos is 5")
+    func maxPhotosValue() {
+        #expect(ImportRecipeViewModel.maxPhotos == 5)
     }
 }

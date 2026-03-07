@@ -54,22 +54,25 @@ Both sources use the same extraction prompt (with minor source-specific preamble
 - [ ] On error, shows alert with error description and retry option
 - [ ] Import is disabled when no API key is configured (shows guidance to visit Settings)
 
-### Import Flow (Photo — new)
+### Import Flow (Photo)
 - [ ] "Import from Photo" presents a sheet with options to take a photo or choose from library
 - [ ] Camera option uses `UIImagePickerController` (via `UIViewControllerRepresentable`) with `.camera` source
-- [ ] Photo library option uses `PhotosPicker` from PhotosUI framework
-- [ ] Selected image is displayed as a preview in the import sheet
-- [ ] User taps "Import Recipe" to send the image to Claude
-- [ ] Image is resized if needed to stay within the API's size limits (max 5MB after base64 encoding)
-- [ ] Shows loading indicator with "Extracting recipe from photo..." while calling API
+- [ ] Photo library option uses `PhotosPicker` from PhotosUI framework with `maxSelectionCount: 5`
+- [ ] User can select multiple photos (up to 5) for multi-page recipes (e.g., cookbook spreads)
+- [ ] Selected images are displayed as a scrollable row of thumbnails in the import sheet
+- [ ] Each thumbnail has an "x" button to remove it
+- [ ] A "+" button at the end of the thumbnail row allows adding more photos (from library or camera)
+- [ ] User taps "Import Recipe" to send all images to Claude in a single API call
+- [ ] Each image is resized individually if needed to stay within API size limits (max 5MB per image after base64 encoding)
+- [ ] Shows loading indicator with "Extracting recipe from photo..." (or "...photos" if multiple) while calling API
 - [ ] On success, opens RecipeFormView in `.add` mode pre-populated with extracted data
 - [ ] On error, shows alert with error description and retry option
 - [ ] Import is disabled when no API key is configured (shows guidance to visit Settings)
-- [ ] User can retake/reselect photo before importing
+- [ ] User can add/remove/replace photos before importing
 
 ### API Integration
 - [ ] **Website**: URL sent directly to the Anthropic Messages API — Claude fetches the page content via `web_fetch` tool
-- [ ] **Photo**: Image sent as a base64-encoded `image` content block in the user message — no tools needed
+- [ ] **Photo**: Images sent as base64-encoded `image` content blocks in the user message (one block per photo) — no tools needed
 - [ ] API request includes proper headers: `x-api-key`, `anthropic-version`, `content-type`
 - [ ] Claude response parsed into recipe fields (title, description, tags, yields, ingredients, instructions)
 - [ ] If Claude responds with `NOT_A_RECIPE`, show an appropriate error
@@ -102,56 +105,56 @@ Features/Import/ViewModels/
 
 ### AnthropicAPIService Changes (`Core/Services/AnthropicAPIService.swift`)
 
-Add a new method to send an image to Claude for recipe extraction. The existing `extractRecipe(from:apiKey:model:)` method remains unchanged.
+The existing `extractRecipeFromImage` method is updated to accept multiple images. Each image becomes a separate `image` content block in the messages array, followed by a single `text` block with the extraction prompt.
 
 ```swift
-/// Extract a recipe from a photo by sending the image to Claude.
-func extractRecipeFromImage(
-    imageData: Data,
-    mediaType: String,   // e.g. "image/jpeg"
+/// Extract a recipe from one or more photos by sending the images to Claude.
+func extractRecipeFromImages(
+    images: [(data: Data, mediaType: String)],
     apiKey: String,
-    model: ClaudeModel
+    model: ClaudeModel,
+    tagPrompt: String = ""
 ) async throws(APIError) -> String {
-    let base64Image = imageData.base64EncodedString()
-    let prompt = Self.buildPhotoPrompt()
+    let prompt = Self.buildPhotoPrompt(tagPrompt: tagPrompt)
+
+    var contentBlocks: [[String: Any]] = images.map { image in
+        [
+            "type": "image",
+            "source": [
+                "type": "base64",
+                "media_type": image.mediaType,
+                "data": image.data.base64EncodedString()
+            ] as [String: Any]
+        ] as [String: Any]
+    }
+    contentBlocks.append([
+        "type": "text",
+        "text": prompt
+    ])
 
     let body: [String: Any] = [
         "model": model.rawValue,
         "max_tokens": 8192,
         "messages": [
-            [
-                "role": "user",
-                "content": [
-                    [
-                        "type": "image",
-                        "source": [
-                            "type": "base64",
-                            "media_type": mediaType,
-                            "data": base64Image
-                        ]
-                    ],
-                    [
-                        "type": "text",
-                        "text": prompt
-                    ]
-                ]
-            ]
+            ["role": "user", "content": contentBlocks] as [String: Any]
         ]
     ]
 
-    let data = try await sendRequest(apiKey: apiKey, body: body)
-    // ... same response parsing as extractRecipe(from:)
+    return try await extractRecipeFromResponse(apiKey: apiKey, body: body)
 }
 ```
 
-**Note**: No `tools` array is needed for photo import — the image is sent directly as content.
+The old single-image `extractRecipeFromImage` method is removed; callers wrap a single image in an array.
+
+**Note**: No `tools` array is needed for photo import — images are sent directly as content.
 
 #### Shared Extraction Prompt
 
 Factor the recipe formatting instructions into a shared constant used by both methods. The preamble differs per source:
 
 - **Website preamble**: `"Fetch the following URL and extract the recipe into structured markdown format:\n\n{url}\n\n"`
-- **Photo preamble**: `"Extract the recipe from this photo into structured markdown format.\n\n"`
+- **Photo preamble (single)**: `"Extract the recipe from this photo into structured markdown format.\n\n"`
+- **Photo preamble (multiple)**: `"These photos show different parts of the same recipe (e.g., a multi-page cookbook spread). Combine them into a single complete recipe in structured markdown format.\n\n"`
 
 The formatting instructions (steps 1–8, rules) remain identical:
 
@@ -195,88 +198,55 @@ case imageTooLarge  // "The image is too large. Try a smaller photo or lower res
 
 ### ImportRecipeViewModel Changes
 
-Add an `ImportSource` enum and photo-related state:
+The view model changes from single-image state to multi-image state:
 
 ```swift
 @MainActor
 @Observable
 class ImportRecipeViewModel {
-    enum ImportSource {
-        case website
-        case photo
-    }
-
-    enum ImportState: Equatable {
-        case idle
-        case extractingRecipe
-        case success(String)
-        case error(String)
-    }
+    // ... ImportSource, ImportState enums unchanged ...
 
     var source: ImportSource = .website
     var urlText: String = ""
-    var selectedImageData: Data? = nil
-    var selectedImageMediaType: String = "image/jpeg"
+    var selectedImages: [(data: Data, mediaType: String)] = []  // was single selectedImageData
     var state: ImportState = .idle
 
-    var isImporting: Bool { ... }
+    static let maxPhotos = 5
+
+    var canAddMorePhotos: Bool {
+        selectedImages.count < Self.maxPhotos
+    }
 
     var statusMessage: String {
         switch state {
         case .extractingRecipe:
-            return source == .website
-                ? "Extracting recipe with Claude..."
+            if source == .website {
+                return "Extracting recipe with Claude..."
+            }
+            return selectedImages.count > 1
+                ? "Extracting recipe from \(selectedImages.count) photos..."
                 : "Extracting recipe from photo..."
         default: return ""
         }
     }
 
-    var hasAPIKey: Bool { ... }
-
-    func importRecipe() async {
-        switch source {
-        case .website:
-            await importFromWebsite()
-        case .photo:
-            await importFromPhoto()
+    func addImage(_ image: UIImage) {
+        guard canAddMorePhotos else { return }
+        if let data = Self.resizeImageIfNeeded(image) {
+            selectedImages.append((data: data, mediaType: "image/jpeg"))
         }
     }
 
-    private func importFromWebsite() async { ... }  // existing logic
+    func removeImage(at index: Int) {
+        selectedImages.remove(at: index)
+    }
 
     private func importFromPhoto() async {
-        guard let imageData = selectedImageData else {
+        guard !selectedImages.isEmpty else {
             state = .error("No photo selected.")
             return
         }
-
-        // Validate image size (base64 expands ~33%, API limit is roughly 5MB encoded)
-        let maxSize = 3_750_000  // ~5MB after base64 encoding
-        guard imageData.count <= maxSize else {
-            state = .error("The image is too large. Try a smaller photo or lower resolution.")
-            return
-        }
-
-        // Same pattern as importFromWebsite: read key, call API, clean, validate
-        do {
-            guard let apiKey = try KeychainService.read(key: "anthropic-api-key"), !apiKey.isEmpty else {
-                state = .error("No API key configured. Add your key in Settings.")
-                return
-            }
-            let model = ...
-
-            state = .extractingRecipe
-            let service = AnthropicAPIService()
-            let rawMarkdown = try await service.extractRecipeFromImage(
-                imageData: imageData,
-                mediaType: selectedImageMediaType,
-                apiKey: apiKey,
-                model: model
-            )
-
-            let markdown = Self.cleanMarkdown(rawMarkdown)
-            // ... same validation and state updates as website import
-        } catch { ... }
+        // ... read key, call extractRecipeFromImages(images: selectedImages, ...), clean, validate
     }
 }
 ```
@@ -404,30 +374,32 @@ Each menu item presents `ImportRecipeView` with the appropriate source pre-selec
 │                                     │
 │  ─── When "Photo" selected ──────   │
 │                                     │
-│  Take a photo of a recipe or choose │
-│  one from your library.             │
+│  Take photos of a recipe or choose  │
+│  from your library. Select multiple │
+│  photos for multi-page recipes.     │
 │                                     │
-│ ┌─────────────────────────────────┐ │
-│ │                                 │ │
-│ │        [Photo preview]          │ │  ← Shows after selection
-│ │                                 │ │
-│ └─────────────────────────────────┘ │
+│ ┌───────┐ ┌───────┐ ┌───────┐      │
+│ │ photo │ │ photo │ │  +    │      │  ← Scrollable thumbnail row
+│ │   1   │ │   2   │ │ Add   │      │    with remove (x) buttons
+│ │  (x)  │ │  (x)  │ │ More  │      │    and add-more button
+│ └───────┘ └───────┘ └───────┘      │
 │                                     │
 │ ┌───────────┐  ┌────────────────┐  │
-│ │  Camera   │  │ Photo Library  │  │  ← Two buttons
+│ │  Camera   │  │ Photo Library  │  │  ← Two buttons (initial state)
 │ └───────────┘  └────────────────┘  │
 │                                     │
 │ ┌─────────────────────────────────┐ │
-│ │         Import Recipe           │ │  ← Disabled until photo selected
+│ │         Import Recipe           │ │  ← Disabled until ≥1 photo
 │ └─────────────────────────────────┘ │
 │                                     │
 └─────────────────────────────────────┘
 ```
 
 **States (Photo tab)**:
-- **No photo**: Camera and Photo Library buttons shown. Import button disabled.
-- **Photo selected**: Preview image displayed. Camera/Library buttons change to "Retake" / "Choose Different". Import button enabled.
-- **Extracting**: ProgressView + "Extracting recipe from photo..." text. Buttons disabled.
+- **No photos**: Camera and Photo Library buttons shown. Import button disabled.
+- **Photos selected**: Thumbnail row displayed with remove buttons and "+" to add more (up to 5). Import button enabled.
+- **Max photos reached**: "+" add-more button hidden. Camera/Library buttons still visible but disabled.
+- **Extracting**: ProgressView + status text. Buttons disabled.
 - **Success**: Sheet dismisses, `RecipeFormView` opens in `.add` mode with pre-populated fields.
 - **Error**: Alert with error message and "Try Again" / "Cancel" actions.
 
@@ -517,21 +489,38 @@ Identical to the existing website flow — no changes needed:
 9. Verify all form fields are editable
 10. Tap Save and verify recipe is saved successfully
 
-#### TC-080: Import recipe from photo library
+#### TC-080: Import recipe from photo library (single photo)
 1. Configure API key
 2. Tap `+` and select "Import from Photo"
-3. Tap "Photo Library" and select a photo of a recipe
-4. Verify the photo preview appears
+3. Tap "Photo Library" and select one photo of a recipe
+4. Verify the photo thumbnail appears in the thumbnail row
 5. Tap "Import Recipe"
 6. Verify RecipeFormView opens with extracted recipe data
 
-#### TC-081: Retake photo before importing
-1. Select a photo in the import sheet
-2. Verify preview is shown
-3. Tap "Choose Different" or "Retake"
-4. Select a different photo
-5. Verify the new preview replaces the old one
-6. Import and verify the new photo's recipe is extracted
+#### TC-080b: Import recipe from photo library (multiple photos)
+1. Configure API key
+2. Tap `+` and select "Import from Photo"
+3. Tap "Photo Library" and select 2-3 photos of a multi-page recipe
+4. Verify all selected photos appear as thumbnails
+5. Tap "Import Recipe"
+6. Verify loading text says "Extracting recipe from N photos..."
+7. Verify RecipeFormView opens with a single combined recipe
+
+#### TC-081: Add and remove photos before importing
+1. Select 3 photos in the import sheet
+2. Verify all 3 thumbnails are shown
+3. Tap the "x" button on the middle thumbnail
+4. Verify it is removed and 2 thumbnails remain
+5. Tap "+" to add another photo
+6. Verify 3 thumbnails are shown again
+7. Import and verify the correct photos' recipe is extracted
+
+#### TC-081b: Maximum photo limit
+1. Select 5 photos (the maximum)
+2. Verify the "+" add-more button is hidden
+3. Remove one photo
+4. Verify the "+" button reappears
+5. Import succeeds with 4 photos
 
 #### TC-082: Import from photo with no recipe content
 1. Configure API key
@@ -540,10 +529,10 @@ Identical to the existing website flow — no changes needed:
 4. Verify error alert: "This photo doesn't appear to contain a recipe."
 5. Verify "Try Again" returns to photo selection
 
-#### TC-083: Import with oversized image
+#### TC-083: Import with oversized images
 1. Configure API key
-2. Select a very large image
-3. Verify the image is automatically compressed/resized before sending
+2. Select multiple very large images
+3. Verify each image is automatically compressed/resized before sending
 4. Verify the import still succeeds
 
 #### TC-084: Import from photo with no API key
@@ -665,15 +654,30 @@ Identical to the existing website flow — no changes needed:
 2. Verify the key is not stored in UserDefaults (check with debug tools)
 3. Verify the key is readable on next app launch
 
+## Implementation Phases
+
+### Phase 1: Multiple Photo Selection from Library (done)
+- `PhotosPicker` with `maxSelectionCount: 5` for multi-select from photo library
+- Thumbnail row UI with remove buttons and add-more capability
+- API call sends all images as separate content blocks in one request
+- Prompt adapts preamble based on single vs. multiple photos
+
+### Phase 2: Multiple Camera Captures (done)
+- After taking a photo with the camera, a review screen shows the captured photo with "Take Another" and "Done" buttons
+- "Take Another" sends the photo to the parent and re-opens the camera picker for the next shot
+- "Done" sends the photo and dismisses the camera
+- "Take Another" is hidden when the remaining photo limit is reached
+- Camera captures accumulate into the same `selectedImages` array as library picks
+- User can mix camera captures and library selections
+- `CameraView` refactored: `CameraPicker` (UIImagePickerController wrapper) handles capture; `CameraView` manages the review/re-capture loop
+
 ## Open Questions
 - Should we support importing from the iOS Share Sheet (receiving photos from other apps)?
 - Should we offer a crop/rotate UI before sending the photo, or send the full image as-is?
-- Should we support multi-page recipes (selecting multiple photos for a single recipe)?
 
 ## Future Enhancements
 - **Share Sheet Extension**: Accept URLs or photos from the iOS share sheet to trigger import flow
 - **Batch import**: Import multiple recipes from a collection/index page
 - **Import history**: Show a log of previously imported sources
 - **Offline extraction**: Use on-device models for recipe extraction without an API key
-- **Multi-photo import**: Combine multiple photos into a single recipe (e.g., two-page cookbook spread)
 - **OCR preprocessing**: Use Vision framework for local text extraction before sending to Claude for structuring

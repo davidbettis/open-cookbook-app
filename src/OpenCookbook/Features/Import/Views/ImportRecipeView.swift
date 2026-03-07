@@ -22,8 +22,8 @@ struct ImportRecipeView: View {
     @State private var errorMessage = ""
 
     // Photo state
-    @State private var selectedImage: UIImage? = nil
-    @State private var selectedPhotoItem: PhotosPickerItem? = nil
+    @State private var selectedUIImages: [UIImage] = []
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var showCamera = false
 
     var body: some View {
@@ -73,15 +73,19 @@ struct ImportRecipeView: View {
                     break
                 }
             }
-            .onChange(of: selectedPhotoItem) { _, newItem in
-                Task { await loadPhoto(from: newItem) }
+            .onChange(of: selectedPhotoItems) { _, newItems in
+                Task { await loadPhotos(from: newItems) }
             }
             .fullScreenCover(isPresented: $showCamera) {
-                CameraView(image: $selectedImage)
-                    .ignoresSafeArea()
-            }
-            .onChange(of: selectedImage) { _, newImage in
-                processSelectedImage(newImage)
+                let remaining = ImportRecipeViewModel.maxPhotos - selectedUIImages.count
+                CameraView(
+                    maxPhotos: remaining,
+                    onPhotoCaptured: { image in
+                        selectedUIImages.append(image)
+                        viewModel.addImage(image)
+                    }
+                )
+                .ignoresSafeArea()
             }
             .onAppear {
                 viewModel.source = initialSource
@@ -130,13 +134,8 @@ struct ImportRecipeView: View {
 
     private var photoInputSection: some View {
         Section {
-            if let image = selectedImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(maxHeight: 250)
-                    .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            if !selectedUIImages.isEmpty {
+                photoThumbnailRow
             }
 
             HStack {
@@ -145,25 +144,22 @@ struct ImportRecipeView: View {
                     Button {
                         showCamera = true
                     } label: {
-                        Label(
-                            selectedImage == nil ? "Take Photo" : "Retake",
-                            systemImage: "camera"
-                        )
+                        Label("Camera", systemImage: "camera")
                     }
                     .buttonStyle(.bordered)
+                    .disabled(!viewModel.canAddMorePhotos || viewModel.isImporting)
                 }
                 #endif
 
                 PhotosPicker(
-                    selection: $selectedPhotoItem,
+                    selection: $selectedPhotoItems,
+                    maxSelectionCount: max(1, ImportRecipeViewModel.maxPhotos - selectedUIImages.count),
                     matching: .images
                 ) {
-                    Label(
-                        selectedImage == nil ? "Photo Library" : "Choose Different",
-                        systemImage: "photo.on.rectangle"
-                    )
+                    Label("Photo Library", systemImage: "photo.on.rectangle")
                 }
                 .buttonStyle(.bordered)
+                .disabled(!viewModel.canAddMorePhotos || viewModel.isImporting)
             }
             .frame(maxWidth: .infinity, alignment: .center)
 
@@ -174,9 +170,35 @@ struct ImportRecipeView: View {
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(selectedImage == nil || viewModel.isImporting)
+            .disabled(selectedUIImages.isEmpty || viewModel.isImporting)
         } header: {
-            Text("Take a photo of a recipe or choose one from your library.")
+            Text("Take photos of a recipe or choose from your library. Select multiple photos for multi-page recipes.")
+        }
+    }
+
+    private var photoThumbnailRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(Array(selectedUIImages.enumerated()), id: \.offset) { index, image in
+                    ZStack(alignment: .topTrailing) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 80, height: 80)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                        Button {
+                            removePhoto(at: index)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(.white, .black.opacity(0.6))
+                        }
+                        .offset(x: 4, y: -4)
+                    }
+                }
+            }
+            .padding(.vertical, 4)
         }
     }
 
@@ -194,22 +216,20 @@ struct ImportRecipeView: View {
 
     // MARK: - Photo Handling
 
-    private func loadPhoto(from item: PhotosPickerItem?) async {
-        guard let item else { return }
-        if let data = try? await item.loadTransferable(type: Data.self),
-           let image = UIImage(data: data) {
-            selectedImage = image
+    private func loadPhotos(from items: [PhotosPickerItem]) async {
+        for item in items {
+            if let data = try? await item.loadTransferable(type: Data.self),
+               let image = UIImage(data: data) {
+                selectedUIImages.append(image)
+                viewModel.addImage(image)
+            }
         }
+        selectedPhotoItems = []
     }
 
-    private func processSelectedImage(_ image: UIImage?) {
-        guard let image else {
-            viewModel.selectedImageData = nil
-            return
-        }
-        if let data = ImportRecipeViewModel.resizeImageIfNeeded(image) {
-            viewModel.selectedImageData = data
-            viewModel.selectedImageMediaType = "image/jpeg"
-        }
+    private func removePhoto(at index: Int) {
+        guard selectedUIImages.indices.contains(index) else { return }
+        selectedUIImages.remove(at: index)
+        viewModel.removeImage(at: index)
     }
 }

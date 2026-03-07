@@ -1,5 +1,10 @@
 # Release History
 
+1.0.5
+- Support importing recipes from multiple photos (up to 5) for multi-page cookbook spreads, from both photo library and camera
+- Camera now offers "Take Another" after each capture to quickly photograph multiple pages
+- Move Edit button into the "..." overflow menu in recipe detail view
+
 1.0.4
 - Update tag vocabulary: add baking category (cake, cookies, pie), add southern/bbq, simplify cuisine to broad flavor profiles
 - Add recipe sharing: share recipes via iMessage (as readable text), AirDrop, or email (as .recipemd file attachment)

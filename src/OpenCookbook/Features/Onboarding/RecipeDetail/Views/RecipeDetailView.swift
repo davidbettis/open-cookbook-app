@@ -94,19 +94,15 @@ struct RecipeDetailView: View {
                 }
                 .accessibilityLabel("Share Recipe")
 
-                // Edit button
-                if recipeStore != nil {
-                    Button {
-                        loadFullRecipeAndEdit()
-                    } label: {
-                        Image(systemName: "pencil")
-                    }
-                    .accessibilityLabel("Edit Recipe")
-                }
-
                 // More menu
                 if recipeStore != nil {
                     Menu {
+                        Button {
+                            loadFullRecipeAndEdit()
+                        } label: {
+                            Label("Edit Recipe", systemImage: "pencil")
+                        }
+
                         Button {
                             copyRecipeToClipboard()
                         } label: {

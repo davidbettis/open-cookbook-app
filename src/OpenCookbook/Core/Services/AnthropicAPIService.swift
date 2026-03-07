@@ -96,38 +96,35 @@ class AnthropicAPIService {
         return try await extractRecipeFromResponse(apiKey: apiKey, body: body)
     }
 
-    /// Extract a recipe from a photo by sending the image to Claude.
-    func extractRecipeFromImage(
-        imageData: Data,
-        mediaType: String,
+    /// Extract a recipe from one or more photos by sending the images to Claude.
+    func extractRecipeFromImages(
+        images: [(data: Data, mediaType: String)],
         apiKey: String,
         model: ClaudeModel,
         tagPrompt: String = ""
     ) async throws(APIError) -> String {
-        let base64Image = imageData.base64EncodedString()
-        let prompt = Self.buildPhotoPrompt(tagPrompt: tagPrompt)
+        let prompt = Self.buildPhotoPrompt(imageCount: images.count, tagPrompt: tagPrompt)
+
+        var contentBlocks: [[String: Any]] = images.map { image in
+            [
+                "type": "image",
+                "source": [
+                    "type": "base64",
+                    "media_type": image.mediaType,
+                    "data": image.data.base64EncodedString()
+                ] as [String: Any]
+            ] as [String: Any]
+        }
+        contentBlocks.append([
+            "type": "text",
+            "text": prompt
+        ])
 
         let body: [String: Any] = [
             "model": model.rawValue,
             "max_tokens": 8192,
             "messages": [
-                [
-                    "role": "user",
-                    "content": [
-                        [
-                            "type": "image",
-                            "source": [
-                                "type": "base64",
-                                "media_type": mediaType,
-                                "data": base64Image
-                            ] as [String: Any]
-                        ] as [String: Any],
-                        [
-                            "type": "text",
-                            "text": prompt
-                        ] as [String: Any]
-                    ]
-                ] as [String: Any]
+                ["role": "user", "content": contentBlocks] as [String: Any]
             ]
         ]
 
@@ -206,10 +203,16 @@ class AnthropicAPIService {
         """
     }
 
-    /// Build the extraction prompt for a photo.
-    static func buildPhotoPrompt(tagPrompt: String = "") -> String {
-        """
-        Extract the recipe from this photo into structured markdown format.
+    /// Build the extraction prompt for one or more photos.
+    static func buildPhotoPrompt(imageCount: Int = 1, tagPrompt: String = "") -> String {
+        let preamble = if imageCount > 1 {
+            "These photos show different parts of the same recipe (e.g., a multi-page cookbook spread). Combine them into a single complete recipe in structured markdown format."
+        } else {
+            "Extract the recipe from this photo into structured markdown format."
+        }
+
+        return """
+        \(preamble)
 
         \(recipeExtractionInstructions(tagPrompt: tagPrompt))
         """
