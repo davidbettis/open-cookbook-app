@@ -12,7 +12,7 @@ import Testing
 @Suite("TagVocabulary")
 struct TagVocabularyTests {
 
-    @Test("All built-in tags total 38")
+    @Test("All built-in tags total 39")
     func allBuiltInTagsCount() {
         #expect(TagVocabulary.allBuiltInTags.count == 38)
     }
@@ -57,11 +57,11 @@ struct TagVocabularyTests {
     @Test("Each category has expected tag count")
     func categoriesHaveExpectedCounts() {
         #expect(TagVocabulary.Category.cuisine.tags.count == 8)
-        #expect(TagVocabulary.Category.meal.tags.count == 7)
+        #expect(TagVocabulary.Category.meal.tags.count == 6)
         #expect(TagVocabulary.Category.method.tags.count == 7)
         #expect(TagVocabulary.Category.diet.tags.count == 4)
         #expect(TagVocabulary.Category.protein.tags.count == 9)
-        #expect(TagVocabulary.Category.baking.tags.count == 3)
+        #expect(TagVocabulary.Category.baking.tags.count == 4)
     }
 
     @Test("No duplicate tags across categories")

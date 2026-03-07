@@ -94,43 +94,29 @@ struct TagPickerView: View {
                 .padding(.vertical, 4)
             }
 
-            // Custom tags section
-            if !filteredCustomTags.isEmpty || !filteredNewCustomTags.isEmpty || searchText.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Custom")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.secondary)
+            // Custom tag input
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Custom")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
 
-                    if !filteredCustomTags.isEmpty || !filteredNewCustomTags.isEmpty {
-                        FlowLayout(spacing: 8) {
-                            ForEach(filteredCustomTags) { freq in
-                                pickerChip(tag: freq.name, count: freq.count)
-                            }
-                            ForEach(filteredNewCustomTags, id: \.self) { tag in
-                                pickerChip(tag: tag, count: 0)
-                            }
-                        }
+                HStack {
+                    TextField("Add custom tag", text: $customTagText)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .onSubmit { onAddCustomTag() }
+
+                    Button {
+                        onAddCustomTag()
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(Color.accentColor)
                     }
-
-                    HStack {
-                        TextField("Add custom tag", text: $customTagText)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .onSubmit { onAddCustomTag() }
-
-                        Button {
-                            onAddCustomTag()
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .foregroundStyle(Color.accentColor)
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(customTagText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                    .padding(.top, 8)
+                    .buttonStyle(.plain)
+                    .disabled(customTagText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
-                .padding(.vertical, 4)
             }
+            .padding(.vertical, 4)
         }
     }
 

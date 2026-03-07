@@ -33,7 +33,7 @@ struct TagVocabulary {
             case .meal:
                 return [
                     "appetizer", "main", "snack", "dessert", "baking",
-                    "breakfast", "brunch"
+                    "breakfast"
                 ]
 	    // Intent here is not to exhaustively categorize every method, but
 	    // highlight less typical ones.
@@ -50,7 +50,7 @@ struct TagVocabulary {
                     "fish", "shrimp", "tofu", "eggs"
                 ]
             case .baking:
-                return ["cake", "cookies", "pie"]
+                return ["bread", "cake", "cookies", "pie"]
             }
         }
     }

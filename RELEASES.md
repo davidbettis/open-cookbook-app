@@ -4,6 +4,8 @@
 - Support importing recipes from multiple photos (up to 5) for multi-page cookbook spreads, from both photo library and camera
 - Camera now offers "Take Another" after each capture to quickly photograph multiple pages
 - Move Edit button into the "..." overflow menu in recipe detail view
+- Update tag vocabulary: add bread to baking, remove brunch
+- Hide custom tag list in recipe form tag picker (custom tag input field remains)
 
 1.0.4
 - Update tag vocabulary: add baking category (cake, cookies, pie), add southern/bbq, simplify cuisine to broad flavor profiles
