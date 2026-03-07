@@ -13,62 +13,71 @@ Users want to share recipes with friends/family. Since OpenCookbook has no centr
 | **External service (S3)** | Contradicts privacy-first philosophy. Recipes are small enough that server infrastructure is unnecessary. |
 | **CloudKit public database** | Overengineered. "No server" philosophy. |
 | **Custom URL scheme** | No fallback when app isn't installed — link does nothing. Poor UX. |
+| **ShareLink + Transferable** | Evaluated during implementation. `UIActivityViewController` was chosen instead because it allows per-target content adaptation (e.g., plain text for iMessage, file attachment for AirDrop/email). `ShareableRecipe` (Transferable conformance) was built but is unused dead code. |
 
 ---
 
-## Phase 1: Share Sheet + File Registration (3-5 days)
+## Implementation: Share Sheet + File Registration
 
-### 1a. Enhanced Share Sheet
+### Custom File Type Registration (`.recipemd`)
 
-**Problem**: The current `ShareLink(item: filePath)` in `RecipeDetailView.swift:82` shares the raw file URL — useless to recipients without direct iCloud access to that file.
+A single extension `.recipemd` is used (not the compound `.recipe.md` originally considered). This avoids ambiguity with generic `.md` files while keeping the content as valid plain-text markdown.
 
-**Solution**: Share the recipe as a `.recipe.md` file via `Transferable`. The file is plain text, so it's human-readable even without the app. Recipients with OpenCookbook installed can tap to open and import directly.
-
-- **Sender**: Tap share → iOS share sheet → iMessage, email, AirDrop, Notes, etc.
-- **Receiver (with app)**: Gets a `.recipe.md` file → taps → "Open in OpenCookbook" → import preview → save.
-- **Receiver (without app)**: Gets a `.recipe.md` file they can open in any text editor — it's valid markdown.
-
-**Note**: The system determines how the `Transferable` representations are used by each share target. iMessage/email may send the file as an attachment rather than inline text. This is fine — the file is readable in any text editor.
+**UTI**: `com.opencookbook.recipemd`, conforming to `public.text`
 
 **Build**:
-- Modify `ShareLink` in `RecipeDetailView.swift` to use a custom `Transferable` type
-- Implement `Transferable` conformance with `fileRepresentation` (as `.recipe.md`) and `plainText` fallback
-- Use `RecipeFileSerializer().serialize(recipeFile)` to generate the markdown content
+- `UTExportedTypeDeclarations` in `Info.plist` declares the UTI with extension `recipemd`
+- `CFBundleDocumentTypes` registers the app as a "Viewer" (owner rank) for the custom UTI
+- `UTType+Recipe.swift` provides a Swift extension `UTType.recipeMD` for programmatic access
 
-### 1b. Custom File Type Registration (`.recipe.md`)
+### Share Sheet (Sending)
 
-Use a compound extension `.recipe.md` so OpenCookbook only handles recipe files, not all markdown. Files remain valid markdown (any text editor opens them via the `.md` outer extension), while the compound extension signals "this is a recipe" to both humans and iOS.
+**Problem**: The original `ShareLink(item: filePath)` shared the raw file URL — useless to recipients without direct iCloud access.
 
-Example filename: `Chocolate Chip Cookies.recipe.md`
+**Solution**: `UIActivityViewController` with custom `UIActivityItemSource` adapters that tailor content per share target.
 
-- **Sender**: AirDrop/share sends a `.recipe.md` file (via `Transferable` in Phase 1a)
-- **Receiver**: Gets `.recipe.md` file → taps → "Open in OpenCookbook" → sees recipe preview → "Save to My Recipes"
+- **iMessage/Pasteboard**: Sends plain markdown text + promotional message with App Store link
+- **AirDrop/Email**: Sends a `.recipemd` file attachment
+- **Email**: Custom email body via `RecipeEmailBodySource` with promo link
 
-**Build**:
-- Declare an exported UTI (`com.opencookbook.recipemd`) with compound extension `recipe.md`, conforming to `public.plain-text`
-- Add `CFBundleDocumentTypes` to Info.plist for the custom UTI
-- Add `.onOpenURL` handler to `OpenCookbookApp.swift`
-- New `RecipeImportPreviewView` — shows parsed recipe with Save/Cancel buttons
-- Validate content parses as RecipeMD; show friendly error if not
-- Edge case: if app isn't onboarded yet, queue recipe in `@AppStorage`, prompt to save after folder selection
-- Verify early: confirm iOS 17 correctly matches compound extensions in `UTExportedTypeDeclarations`
+Filename format: `{recipe-title}.recipemd`
 
-**Files modified:**
-- `Features/Onboarding/RecipeDetail/Views/RecipeDetailView.swift` — change ShareLink to use Transferable
-- `App/OpenCookbookApp.swift` — add `.onOpenURL` handler
-- `Info.plist` — add `UTExportedTypeDeclarations` and `CFBundleDocumentTypes`
-- New: `Features/Sharing/Views/RecipeImportPreviewView.swift`
-- New: `Features/Sharing/Services/IncomingRecipeHandler.swift`
+Promotional message included in text shares: "Check out Open Cookbook to build a free recipe library. https://apps.apple.com/app/open-cookbook/id6740043751"
+
+**Files**:
+- `Features/Sharing/Views/RecipeShareSheet.swift` — `UIActivityViewController` wrapper with `RecipeActivitySource` and `RecipeEmailBodySource`
+- `Features/Onboarding/RecipeDetail/Views/RecipeDetailView.swift` — share button presents `RecipeShareSheet` as a sheet with `.presentationDetents([.medium, .large])`. iOS only (`#if canImport(UIKit)`)
+
+### Receiving Shared Recipes
+
+**Flow**: Incoming `.recipemd` file -> `.onOpenURL` handler -> validation -> recipe edit form
+
+- **`.onOpenURL` handler** in `OpenCookbookApp.swift` processes incoming `.recipemd` files
+- **`IncomingRecipeHandler`** service (`Features/Sharing/Services/IncomingRecipeHandler.swift`) handles file reading and validation:
+  - `handleIncomingFile(at:)` — reads file from URL (handles security-scoped resources for AirDrop)
+  - `handleIncomingMarkdown(_:)` — validates markdown parses as a recipe with a non-empty title
+  - Returns `IncomingRecipe` struct (raw markdown + parsed `Recipe`)
+  - Error types: `.fileUnreadable`, `.notARecipe`
+- **Import UX**: Routes through the recipe edit form (`RecipeFormView`), not a dedicated preview view. The user can review and edit before saving.
+
+**Pre-onboarding edge case**: If the app isn't onboarded yet (no folder selected), the recipe markdown is queued in `UserDefaults` (key: `"pendingImportRecipeMarkdown"`). After folder selection, it's loaded and offered for import.
+
+**Pending import plumbing**:
+- `FolderManager.pendingImportMarkdown: String?` passes recipes from app entry point to recipe list
+- `RecipeListView` watches this property, clears it, and routes through `handleImportedRecipe(markdown:)`
+
+### Clipboard Import (Bonus)
+
+Not in the original spec but implemented: a "Paste Recipe" menu option in the add-recipe menu (`RecipeListView`). Checks clipboard for valid recipe markdown via `IncomingRecipeHandler.handleIncomingMarkdown()` and routes to the edit form.
 
 ---
 
-## Phase 2: Polish (2-3 days)
+## Dead Code
 
-### 2a. Duplicate Detection
-When importing a shared recipe, check if a recipe with the same title already exists. Offer "Replace," "Keep Both" (appends number), or "Cancel."
+The following files were built during development but are not used in the current flow:
 
-### 2b. Share as Image (optional stretch)
-Generate a nice-looking image/card of the recipe for sharing on social media or messaging apps where markdown renders poorly. Use SwiftUI's `ImageRenderer` to create a shareable image from a styled recipe card view.
+- `Features/Sharing/Models/ShareableRecipe.swift` — `Transferable` conformance for `ShareLink`. Superseded by `UIActivityViewController` approach.
+- `Features/Sharing/Views/RecipeImportPreviewView.swift` — dedicated import preview with Save/Cancel. Superseded by routing imports through the recipe edit form.
 
 ---
 
@@ -76,17 +85,43 @@ Generate a nice-looking image/card of the recipe for sharing on social media or 
 
 | Scenario | Handling |
 |----------|----------|
-| Incoming `.recipe.md` fails to parse | "This doesn't appear to be a valid recipe" error with OK to dismiss |
-| App not onboarded (no folder selected) | Queue pending recipe in `@AppStorage` as raw markdown. After onboarding, prompt to save. |
-| Recipe with same title exists | Phase 2: Replace / Keep Both / Cancel dialog |
-| macOS compatibility | `ShareLink`, `Transferable`, and `.onOpenURL` are cross-platform SwiftUI APIs — no platform-specific code needed |
+| Incoming `.recipemd` fails to parse | Error alert shown to user |
+| App not onboarded (no folder selected) | Queue pending recipe in `UserDefaults`. After onboarding, prompt to save. |
+| macOS compatibility | Share sheet is iOS-only (`#if canImport(UIKit)`). File receiving via `.onOpenURL` is cross-platform. |
 
 ---
 
-## Verification
+## Future Considerations
 
-- **Phase 1 — Send**: Share a recipe via iMessage → verify recipient gets a `.recipe.md` file attachment that is readable as plain text.
-- **Phase 1 — Receive via AirDrop**: AirDrop a `.recipe.md` file → verify "Open in OpenCookbook" appears → verify import preview shows correctly → save and verify it appears in library.
-- **Phase 1 — Non-recipe .md**: Verify that regular `.md` files (READMEs, notes) do NOT show "Open in OpenCookbook."
-- **Phase 1 — Invalid .recipe.md**: Open a malformed `.recipe.md` in OpenCookbook → verify friendly error message, no crash.
-- **Phase 2 — Duplicate**: Import a recipe with existing title → verify Replace/Keep Both/Cancel dialog.
+These were planned but not yet implemented:
+
+- **Duplicate detection**: Check if a recipe with the same title already exists when importing. Offer Replace / Keep Both / Cancel.
+- **Share as image**: Generate a styled recipe card image for social media sharing using `ImageRenderer`.
+
+---
+
+## Tests
+
+`OpenCookbookTests/IncomingRecipeHandlerTests.swift` — 12 test cases covering:
+- Parse valid RecipeMD markdown
+- Reject non-recipe text and empty strings
+- Parse minimal recipes (title + ingredients only)
+- File handling: valid files, missing files, non-recipe files
+
+---
+
+## Files
+
+| File | Role |
+|------|------|
+| `src/Info.plist` | UTI and document type declarations |
+| `Core/Extensions/UTType+Recipe.swift` | `UTType.recipeMD` extension |
+| `Features/Sharing/Views/RecipeShareSheet.swift` | Share sheet (UIActivityViewController) |
+| `Features/Sharing/Services/IncomingRecipeHandler.swift` | File reading and validation |
+| `Features/Sharing/Models/ShareableRecipe.swift` | Unused Transferable model (dead code) |
+| `Features/Sharing/Views/RecipeImportPreviewView.swift` | Unused import preview (dead code) |
+| `Features/Onboarding/RecipeDetail/Views/RecipeDetailView.swift` | Share button in recipe detail |
+| `App/OpenCookbookApp.swift` | `.onOpenURL` handler |
+| `Core/Services/FolderManager.swift` | `pendingImportMarkdown` property |
+| `Features/RecipeList/Views/RecipeListView.swift` | Pending import + clipboard import handling |
+| `OpenCookbookTests/IncomingRecipeHandlerTests.swift` | Unit tests |
