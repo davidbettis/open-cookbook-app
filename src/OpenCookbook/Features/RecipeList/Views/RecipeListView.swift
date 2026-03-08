@@ -132,9 +132,6 @@ struct RecipeListView: View {
     @State private var deleteError: Error?
     @State private var showDeleteError = false
 
-    @State private var clipboardError: String?
-    @State private var showClipboardError = false
-
     // Bulk edit mode state
     @State private var showBulkAddTags = false
     @State private var showBulkRemoveTags = false
@@ -188,7 +185,12 @@ struct RecipeListView: View {
                 }
                 if !viewModel.isEditMode {
                     ToolbarItem(placement: .primaryAction) {
-                        addRecipeMenu
+                        RecipeAddMenu(
+                            onNewRecipe: { showAddRecipe = true },
+                            onImportFromWebsite: { importSource = .website },
+                            onImportFromPhoto: { importSource = .photo },
+                            onPasteRecipe: { handleImportedRecipe($0) }
+                        )
                     }
                 }
             }
@@ -474,65 +476,6 @@ struct RecipeListView: View {
         }
         withAnimation {
             showToast = true
-        }
-    }
-
-    // MARK: - Add Recipe Menu
-
-    private var addRecipeMenu: some View {
-        Menu {
-            Button {
-                showAddRecipe = true
-            } label: {
-                Label("New Recipe", systemImage: "square.and.pencil")
-            }
-            Button {
-                importRecipeFromClipboard()
-            } label: {
-                Label("Paste Recipe", systemImage: "doc.on.clipboard")
-            }
-            .disabled(!clipboardHasText)
-            Button {
-                importSource = .website
-            } label: {
-                Label("Import from Website", systemImage: "globe")
-            }
-            Button {
-                importSource = .photo
-            } label: {
-                Label("Import from Photo", systemImage: "camera")
-            }
-        } label: {
-            Image(systemName: "plus")
-        }
-        .accessibilityLabel("Add Recipe")
-        .alert("Paste Recipe", isPresented: $showClipboardError) {
-            Button("OK") {}
-        } message: {
-            if let error = clipboardError {
-                Text(error)
-            }
-        }
-    }
-
-    /// Whether the clipboard currently contains text
-    private var clipboardHasText: Bool {
-        UIPasteboard.general.hasStrings
-    }
-
-    /// Import a recipe from the clipboard
-    private func importRecipeFromClipboard() {
-        guard let text = UIPasteboard.general.string, !text.isEmpty else {
-            clipboardError = "Nothing on the clipboard."
-            showClipboardError = true
-            return
-        }
-        do {
-            let incoming = try IncomingRecipeHandler.handleIncomingMarkdown(text)
-            handleImportedRecipe(incoming.markdown)
-        } catch {
-            clipboardError = "The clipboard doesn't appear to contain a recipe."
-            showClipboardError = true
         }
     }
 

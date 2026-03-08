@@ -238,8 +238,6 @@ final class FolderManager {
     /// Checks if a folder has been selected and saved
     /// - Returns: True if a folder is currently selected
     func hasSelectedFolder() -> Bool {
-        // TODO: Implement check for saved bookmark
-        // Will be implemented in Task 2.1
         return UserDefaults.standard.data(forKey: "selectedFolderBookmark") != nil
     }
 

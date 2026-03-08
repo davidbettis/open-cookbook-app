@@ -64,11 +64,11 @@ struct TagVocabulary {
     }()
 
     static func isBuiltIn(_ tag: String) -> Bool {
-        allBuiltInTags.contains(tag.lowercased())
+        allBuiltInTags.contains(tag.normalizedTag)
     }
 
     static func category(for tag: String) -> Category? {
-        let normalized = tag.lowercased()
+        let normalized = tag.normalizedTag
         return Category.allCases.first { $0.tags.contains(normalized) }
     }
 }

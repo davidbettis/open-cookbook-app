@@ -45,8 +45,8 @@ class RecipeStore {
     /// File monitor for watching folder changes
     private let fileMonitor: RecipeFileMonitor
 
-    /// Cache of parsed recipes with modification dates
-    private var recipeCache: [URL: CachedRecipeFile] = [:]
+    /// Cache of parsed recipes keyed by file URL
+    private var recipeCache: [URL: RecipeFile] = [:]
 
     // MARK: - Initialization
 
@@ -119,39 +119,18 @@ class RecipeStore {
         defer { isSaving = false }
 
         return try folder.withSecurityScopedAccess {
-            // Generate unique filename
-            let fileURL: URL
-            do {
-                fileURL = try filenameGenerator.generateFileURL(for: recipeFile.title, in: folder)
-        } catch {
-            throw RecipeWriteError.invalidFilename
-        }
+            let fileURL = try generateFileURL(for: recipeFile.title, in: folder)
+            let markdown = serializer.serialize(recipeFile)
+            try writeMarkdown(markdown, to: fileURL)
 
-        // Serialize recipe to markdown
-        let markdown = serializer.serialize(recipeFile)
+            let savedRecipeFile = RecipeFile(
+                id: recipeFile.id,
+                filePath: fileURL,
+                recipe: recipeFile.recipe,
+                fileModifiedDate: Date()
+            )
 
-        // Write to file atomically
-        do {
-            try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
-        } catch {
-            throw RecipeWriteError.writeError(underlying: error)
-        }
-
-        // Create new recipe file with correct file path
-        let savedRecipeFile = RecipeFile(
-            id: recipeFile.id,
-            filePath: fileURL,
-            recipe: recipeFile.recipe,
-            fileModifiedDate: Date()
-        )
-
-        // Add to recipes array and cache with animation for smooth UI update
-        withAnimation {
-            recipes.append(savedRecipeFile)
-            recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-        }
-        recipeCache[fileURL] = CachedRecipeFile(recipeFile: savedRecipeFile, modificationDate: Date())
-
+            insertInStore(savedRecipeFile)
             return savedRecipeFile
         }
     }
@@ -166,45 +145,19 @@ class RecipeStore {
         let fileURL = recipeFile.filePath
 
         try fileURL.withSecurityScopedAccess {
-            // Verify file exists
-            guard FileManager.default.fileExists(atPath: fileURL.path) else {
-                throw RecipeWriteError.writeError(underlying: NSError(
-                    domain: "RecipeStore",
-                    code: -1,
-                    userInfo: [NSLocalizedDescriptionKey: "Original file not found"]
-                ))
-            }
-
-            // Serialize recipe to markdown
+            try verifyFileExists(at: fileURL)
             let markdown = serializer.serialize(recipeFile)
+            try writeMarkdown(markdown, to: fileURL)
 
-        // Write to file atomically (overwrites existing)
-        do {
-            try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
-        } catch {
-            throw RecipeWriteError.writeError(underlying: error)
-        }
+            let updatedRecipeFile = RecipeFile(
+                id: recipeFile.id,
+                filePath: fileURL,
+                recipe: recipeFile.recipe,
+                fileModifiedDate: Date()
+            )
 
-        // Update recipe file with new modification date
-        let updatedRecipeFile = RecipeFile(
-            id: recipeFile.id,
-            filePath: fileURL,
-            recipe: recipeFile.recipe,
-            fileModifiedDate: Date()
-        )
-
-        // Update recipes array with animation for smooth UI update
-        withAnimation {
-            if let index = recipes.firstIndex(where: { $0.id == recipeFile.id }) {
-                recipes[index] = updatedRecipeFile
-            }
-            recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-        }
-
-        // Update cache
-        recipeCache[fileURL] = CachedRecipeFile(recipeFile: updatedRecipeFile, modificationDate: Date())
-
-        NotificationCenter.default.post(name: .recipeDidUpdate, object: recipeFile.id)
+            replaceInStore(updatedRecipeFile)
+            NotificationCenter.default.post(name: .recipeDidUpdate, object: recipeFile.id)
         }
     }
 
@@ -220,36 +173,11 @@ class RecipeStore {
         defer { isSaving = false }
 
         return try folder.withSecurityScopedAccess {
-            // Generate unique filename
-            let fileURL: URL
-            do {
-                fileURL = try filenameGenerator.generateFileURL(for: title, in: folder)
-        } catch {
-            throw RecipeWriteError.invalidFilename
-        }
+            let fileURL = try generateFileURL(for: title, in: folder)
+            try writeMarkdown(markdown, to: fileURL)
+            let savedRecipeFile = try parseWrittenFile(at: fileURL)
 
-        // Write raw markdown to file
-        do {
-            try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
-        } catch {
-            throw RecipeWriteError.writeError(underlying: error)
-        }
-
-        // Parse the written file to get a proper RecipeFile for the store
-        let savedRecipeFile: RecipeFile
-        do {
-            savedRecipeFile = try parser.parse(from: fileURL)
-        } catch {
-            throw RecipeWriteError.serializationError
-        }
-
-        // Add to recipes array and cache with animation
-        withAnimation {
-            recipes.append(savedRecipeFile)
-            recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-        }
-        recipeCache[fileURL] = CachedRecipeFile(recipeFile: savedRecipeFile, modificationDate: Date())
-
+            insertInStore(savedRecipeFile)
             return savedRecipeFile
         }
     }
@@ -263,45 +191,13 @@ class RecipeStore {
         isSaving = true
         defer { isSaving = false }
 
-        let fileURL = filePath
+        try filePath.withSecurityScopedAccess {
+            try verifyFileExists(at: filePath)
+            try writeMarkdown(markdown, to: filePath)
+            let updatedRecipeFile = try parseWrittenFile(at: filePath)
 
-        try fileURL.withSecurityScopedAccess {
-            // Verify file exists
-            guard FileManager.default.fileExists(atPath: fileURL.path) else {
-            throw RecipeWriteError.writeError(underlying: NSError(
-                domain: "RecipeStore",
-                code: -1,
-                userInfo: [NSLocalizedDescriptionKey: "Original file not found"]
-            ))
-        }
-
-        // Write raw markdown to file
-        do {
-            try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
-        } catch {
-            throw RecipeWriteError.writeError(underlying: error)
-        }
-
-        // Re-parse to update the store's in-memory RecipeFile
-        let updatedRecipeFile: RecipeFile
-        do {
-            updatedRecipeFile = try parser.parse(from: fileURL)
-        } catch {
-            throw RecipeWriteError.serializationError
-        }
-
-        // Update recipes array with animation
-        withAnimation {
-            if let index = recipes.firstIndex(where: { $0.filePath == fileURL }) {
-                recipes[index] = updatedRecipeFile
-            }
-            recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-        }
-
-        // Update cache
-        recipeCache[fileURL] = CachedRecipeFile(recipeFile: updatedRecipeFile, modificationDate: Date())
-
-        NotificationCenter.default.post(name: .recipeDidUpdate, object: updatedRecipeFile.id)
+            replaceInStore(updatedRecipeFile)
+            NotificationCenter.default.post(name: .recipeDidUpdate, object: updatedRecipeFile.id)
         }
     }
 
@@ -355,51 +251,83 @@ class RecipeStore {
     // MARK: - Bulk Operations
 
     /// Add tags to multiple recipes at once
-    /// - Parameters:
-    ///   - tags: Tags to add
-    ///   - recipeIDs: IDs of recipes to update
-    /// - Returns: Result with success and failure counts
     func bulkAddTags(_ tags: Set<String>, to recipeIDs: Set<UUID>) -> BulkOperationResult {
-        var successCount = 0
-        var failures: [(RecipeFile, Error)] = []
-
-        for id in recipeIDs {
-            guard let index = recipes.firstIndex(where: { $0.id == id }) else { continue }
-            let recipeFile = recipes[index]
-
-            do {
-                var updated = recipeFile
-                var tagSet = Set(updated.recipe.tags)
-                tagSet.formUnion(tags)
-                updated.recipe.tags = Array(tagSet).sorted()
-                updated.fileModifiedDate = Date()
-
-                try recipeFile.filePath.withSecurityScopedAccess {
-                    let markdown = serializer.serialize(updated)
-                    try markdown.write(to: recipeFile.filePath, atomically: true, encoding: .utf8)
-                }
-
-                recipes[index] = updated
-                recipeCache[recipeFile.filePath] = CachedRecipeFile(recipeFile: updated, modificationDate: Date())
-                successCount += 1
-            } catch {
-                failures.append((recipeFile, error))
-            }
+        bulkModifyTags(for: recipeIDs) { existingTags in
+            var tagSet = Set(existingTags)
+            tagSet.formUnion(tags)
+            existingTags = Array(tagSet).sorted()
         }
-
-        withAnimation {
-            recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
-        }
-
-        return BulkOperationResult(successCount: successCount, failureCount: failures.count, failedRecipes: failures)
     }
 
     /// Remove tags from multiple recipes at once
-    /// - Parameters:
-    ///   - tags: Tags to remove
-    ///   - recipeIDs: IDs of recipes to update
-    /// - Returns: Result with success and failure counts
     func bulkRemoveTags(_ tags: Set<String>, from recipeIDs: Set<UUID>) -> BulkOperationResult {
+        bulkModifyTags(for: recipeIDs) { existingTags in
+            existingTags = existingTags.filter { !tags.contains($0) }
+        }
+    }
+
+    // MARK: - Private Helpers
+
+    /// Generate a unique file URL for a new recipe
+    private func generateFileURL(for title: String, in folder: URL) throws -> URL {
+        do {
+            return try filenameGenerator.generateFileURL(for: title, in: folder)
+        } catch {
+            throw RecipeWriteError.invalidFilename
+        }
+    }
+
+    /// Write markdown content to a file atomically
+    private func writeMarkdown(_ markdown: String, to fileURL: URL) throws {
+        do {
+            try markdown.write(to: fileURL, atomically: true, encoding: .utf8)
+        } catch {
+            throw RecipeWriteError.writeError(underlying: error)
+        }
+    }
+
+    /// Verify that a file exists at the given URL
+    private func verifyFileExists(at fileURL: URL) throws {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            throw RecipeWriteError.writeError(underlying: NSError(
+                domain: "RecipeStore",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Original file not found"]
+            ))
+        }
+    }
+
+    /// Parse a freshly-written file back into a RecipeFile
+    private func parseWrittenFile(at fileURL: URL) throws -> RecipeFile {
+        do {
+            return try parser.parse(from: fileURL)
+        } catch {
+            throw RecipeWriteError.serializationError
+        }
+    }
+
+    /// Add a new recipe to the store and cache
+    private func insertInStore(_ recipeFile: RecipeFile) {
+        withAnimation {
+            recipes.append(recipeFile)
+            recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        }
+        recipeCache[recipeFile.filePath] = recipeFile
+    }
+
+    /// Replace an existing recipe in the store and cache
+    private func replaceInStore(_ recipeFile: RecipeFile) {
+        withAnimation {
+            if let index = recipes.firstIndex(where: { $0.id == recipeFile.id || $0.filePath == recipeFile.filePath }) {
+                recipes[index] = recipeFile
+            }
+            recipes.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        }
+        recipeCache[recipeFile.filePath] = recipeFile
+    }
+
+    /// Shared implementation for bulk tag add/remove operations
+    private func bulkModifyTags(for recipeIDs: Set<UUID>, mutation: (inout [String]) -> Void) -> BulkOperationResult {
         var successCount = 0
         var failures: [(RecipeFile, Error)] = []
 
@@ -409,7 +337,7 @@ class RecipeStore {
 
             do {
                 var updated = recipeFile
-                updated.recipe.tags = recipeFile.recipe.tags.filter { !tags.contains($0) }
+                mutation(&updated.recipe.tags)
                 updated.fileModifiedDate = Date()
 
                 try recipeFile.filePath.withSecurityScopedAccess {
@@ -418,7 +346,7 @@ class RecipeStore {
                 }
 
                 recipes[index] = updated
-                recipeCache[recipeFile.filePath] = CachedRecipeFile(recipeFile: updated, modificationDate: Date())
+                recipeCache[recipeFile.filePath] = updated
                 successCount += 1
             } catch {
                 failures.append((recipeFile, error))
@@ -432,7 +360,7 @@ class RecipeStore {
         return BulkOperationResult(successCount: successCount, failureCount: failures.count, failedRecipes: failures)
     }
 
-    // MARK: - Private Methods
+    // MARK: - Parsing
 
     /// Parse all recipe files from the monitored folder
     private func parseAllRecipes() {
@@ -469,34 +397,23 @@ class RecipeStore {
     private func parseRecipeFile(at url: URL) -> Result<RecipeFile, Error> {
         // Get file modification date
         let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
-        let modDate = attributes?[.modificationDate] as? Date ?? Date()
+        let modDate = attributes?[.modificationDate] as? Date
 
-        // Check cache
+        // Check cache — reuse if file hasn't changed
         if let cached = recipeCache[url],
-           cached.modificationDate == modDate {
-            return .success(cached.recipeFile)
+           modDate != nil,
+           cached.fileModifiedDate == modDate {
+            return .success(cached)
         }
 
         // Parse file
         do {
             let recipeFile = try parser.parse(from: url)
-
-            // Update cache
-            recipeCache[url] = CachedRecipeFile(recipeFile: recipeFile, modificationDate: modDate)
-
+            recipeCache[url] = recipeFile
             return .success(recipeFile)
         } catch {
-            // Remove from cache if parsing fails
             recipeCache.removeValue(forKey: url)
             return .failure(error)
         }
-    }
-
-    // MARK: - Helper Types
-
-    /// Cached recipe file with modification date for cache invalidation
-    private struct CachedRecipeFile {
-        let recipeFile: RecipeFile
-        let modificationDate: Date
     }
 }

@@ -16,7 +16,6 @@ enum IngredientField: Hashable {
 /// A row for entering a single ingredient with amount and name fields
 struct IngredientRowView: View {
     @Binding var ingredient: EditableIngredient
-    let isLastRow: Bool
     let focusedField: FocusState<IngredientField?>.Binding
     let onDelete: () -> Void
     let onTabFromName: () -> Void
@@ -73,7 +72,6 @@ struct IngredientRowView: View {
     @Previewable @FocusState var focus: IngredientField?
     IngredientRowView(
         ingredient: .constant(EditableIngredient()),
-        isLastRow: true,
         focusedField: $focus,
         onDelete: {},
         onTabFromName: {}
@@ -88,7 +86,6 @@ struct IngredientRowView: View {
             amount: "2 cups",
             name: "all-purpose flour"
         )),
-        isLastRow: false,
         focusedField: $focus,
         onDelete: {},
         onTabFromName: {}

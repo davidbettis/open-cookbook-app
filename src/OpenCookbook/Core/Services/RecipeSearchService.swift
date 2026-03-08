@@ -127,8 +127,7 @@ final class RecipeSearchService {
 
         for recipeFile in allRecipes {
             for tag in recipeFile.tags {
-                let normalizedTag = tag.lowercased().trimmingCharacters(in: .whitespaces)
-                tagCounts[normalizedTag, default: 0] += 1
+                tagCounts[tag.normalizedTag, default: 0] += 1
             }
         }
 
@@ -145,55 +144,45 @@ final class RecipeSearchService {
         // Apply tag filter (AND logic - all selected tags must match)
         if !selectedTags.isEmpty {
             results = results.filter { recipeFile in
-                let recipeTags = Set(recipeFile.tags.map { $0.lowercased() })
+                let recipeTags = Set(recipeFile.tags.map { $0.normalizedTag })
                 return selectedTags.allSatisfy { recipeTags.contains($0) }
             }
         }
 
         // Apply search filter
         if !debouncedSearchText.isEmpty {
-            let searchTerm = debouncedSearchText.lowercased()
             results = results.filter { recipeFile in
-                matchesSearch(recipeFile: recipeFile, searchTerm: searchTerm)
+                matchesSearch(recipeFile: recipeFile, searchTerm: debouncedSearchText)
             }
         }
 
         filteredRecipes = results
     }
 
-    /// Check if a recipe matches the search term
-    /// - Parameters:
-    ///   - recipeFile: The recipe file to check
-    ///   - searchTerm: The lowercased search term
-    /// - Returns: True if the recipe matches
+    /// Check if a recipe matches the search term (case- and diacritic-insensitive)
     private func matchesSearch(recipeFile: RecipeFile, searchTerm: String) -> Bool {
         let recipe = recipeFile.recipe
 
-        // Check title
-        if recipe.title.lowercased().contains(searchTerm) {
+        if recipe.title.localizedCaseInsensitiveContains(searchTerm) {
             return true
         }
 
-        // Check description
         if let description = recipe.description,
-           description.lowercased().contains(searchTerm) {
+           description.localizedCaseInsensitiveContains(searchTerm) {
             return true
         }
 
-        // Check tags
-        if recipe.tags.contains(where: { $0.lowercased().contains(searchTerm) }) {
+        if recipe.tags.contains(where: { $0.localizedCaseInsensitiveContains(searchTerm) }) {
             return true
         }
 
-        // Check all ingredients from all groups
         let allIngredients = recipe.ingredientGroups.flatMap { $0.allIngredients }
-        if allIngredients.contains(where: { $0.name.lowercased().contains(searchTerm) }) {
+        if allIngredients.contains(where: { $0.name.localizedCaseInsensitiveContains(searchTerm) }) {
             return true
         }
 
-        // Check instructions
         if let instructions = recipe.instructions,
-           instructions.lowercased().contains(searchTerm) {
+           instructions.localizedCaseInsensitiveContains(searchTerm) {
             return true
         }
 
@@ -231,7 +220,7 @@ extension RecipeSearchService {
 
         for recipe in recipes {
             for tag in recipe.tags {
-                let normalized = tag.lowercased().trimmingCharacters(in: .whitespaces)
+                let normalized = tag.normalizedTag
                 guard !normalized.isEmpty else { continue }
                 tagCounts[normalized, default: 0] += 1
             }

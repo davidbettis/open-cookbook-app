@@ -54,35 +54,17 @@ struct BulkTagRemoveView: View {
 
     private func removeChip(tag: String, count: Int) -> some View {
         let isSelected = selectedTags.contains(tag)
-        return Button {
+        return SelectableChip(
+            "\(tag) (\(count) of \(totalSelected))",
+            isSelected: isSelected,
+            showCheckmark: true
+        ) {
             if isSelected {
                 selectedTags.remove(tag)
             } else {
                 selectedTags.insert(tag)
             }
-        } label: {
-            HStack(spacing: 4) {
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.caption2.weight(.bold))
-                }
-                Text("\(tag) (\(count) of \(totalSelected))")
-            }
-            .font(.subheadline)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(isSelected ? Color.accentColor : Color(.systemGray6))
-            .foregroundStyle(isSelected ? .white : .primary)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .strokeBorder(
-                        isSelected ? Color.clear : Color(.systemGray4),
-                        lineWidth: 1
-                    )
-            )
         }
-        .buttonStyle(.plain)
         .accessibilityLabel("\(tag), \(count) of \(totalSelected) selected recipes")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }

@@ -46,7 +46,7 @@ struct BulkTagAddView: View {
     }
 
     private func addCustomTag() {
-        let tag = customTagText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let tag = customTagText.normalizedTag
         guard !tag.isEmpty else { return }
         selectedTags.insert(tag)
         customTagText = ""

@@ -240,10 +240,8 @@ struct RecipeFormView: View {
         if !viewModel.ingredients.isEmpty || viewModel.ingredientGroups.isEmpty {
             Section {
                 ForEach($viewModel.ingredients) { $ingredient in
-                    let isLast = ingredient.id == viewModel.ingredients.last?.id
                     IngredientRowView(
                         ingredient: $ingredient,
-                        isLastRow: isLast,
                         focusedField: $focusedIngredientField,
                         onDelete: {
                             if let index = viewModel.ingredients.firstIndex(where: { $0.id == ingredient.id }) {
@@ -281,10 +279,8 @@ struct RecipeFormView: View {
         ForEach($viewModel.ingredientGroups) { $group in
             Section {
                 ForEach($group.ingredients) { $ingredient in
-                    let isLast = ingredient.id == group.ingredients.last?.id
                     IngredientRowView(
                         ingredient: $ingredient,
-                        isLastRow: isLast,
                         focusedField: $focusedIngredientField,
                         onDelete: {
                             if let idx = group.ingredients.firstIndex(where: { $0.id == ingredient.id }) {

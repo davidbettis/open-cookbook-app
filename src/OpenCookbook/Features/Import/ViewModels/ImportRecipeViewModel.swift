@@ -104,50 +104,14 @@ class ImportRecipeViewModel {
             return
         }
 
-        do {
-            guard let apiKey = try KeychainService.read(key: "anthropic-api-key"), !apiKey.isEmpty else {
-                state = .error("No API key configured. Add your key in Settings.")
-                return
-            }
-            let model = AnthropicAPIService.ClaudeModel(rawValue: claudeModelRawValue) ?? .sonnet
-
-            state = .extractingRecipe
+        await callAPI(failureContext: "this page", fallbackHint: "Try a different URL.") { service, apiKey, model in
             logger.debug("Importing recipe from \(self.urlText) using model \(model.rawValue)")
-
-            let service = AnthropicAPIService()
-            let rawMarkdown = try await service.extractRecipe(
+            return try await service.extractRecipe(
                 from: urlText,
                 apiKey: apiKey,
                 model: model,
                 tagPrompt: tagPrompt
             )
-
-            #if DEBUG
-            logger.debug("Raw Claude response (\(rawMarkdown.count) chars):\n\(rawMarkdown)")
-            #endif
-
-            let markdown = Self.cleanMarkdown(rawMarkdown)
-
-            #if DEBUG
-            logger.debug("Cleaned markdown (\(markdown.count) chars):\n\(markdown)")
-            #endif
-
-            // Verify it looks like a recipe (starts with # title) but don't
-            // require a full strict parse — the form can handle imperfect markdown
-            let trimmed = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard trimmed.hasPrefix("# ") else {
-                logger.error("Response does not start with '# ' — not a valid recipe heading")
-                state = .error("Could not extract a recipe from this page. Try a different URL.")
-                return
-            }
-
-            state = .success(markdown)
-        } catch let error as AnthropicAPIService.APIError {
-            logger.error("API error: \(error.errorDescription ?? "unknown")")
-            state = .error(error.errorDescription ?? "An unknown error occurred.")
-        } catch {
-            logger.error("Import failed: \(error.localizedDescription)")
-            state = .error("Could not extract a recipe from this page. Try a different URL.")
         }
     }
 
@@ -159,6 +123,26 @@ class ImportRecipeViewModel {
             return
         }
 
+        await callAPI(failureContext: "this photo", fallbackHint: "Try a different photo.") { service, apiKey, model in
+            let totalBytes = selectedImages.reduce(0) { $0 + $1.data.count }
+            logger.debug("Importing recipe from \(self.selectedImages.count) photo(s) (\(totalBytes) bytes) using model \(model.rawValue)")
+            return try await service.extractRecipeFromImages(
+                images: selectedImages,
+                apiKey: apiKey,
+                model: model,
+                tagPrompt: tagPrompt
+            )
+        }
+    }
+
+    // MARK: - Shared Import Logic
+
+    /// Shared implementation for calling the API, cleaning the response, and validating the result.
+    private func callAPI(
+        failureContext: String,
+        fallbackHint: String,
+        extract: (AnthropicAPIService, String, AnthropicAPIService.ClaudeModel) async throws -> String
+    ) async {
         do {
             guard let apiKey = try KeychainService.read(key: "anthropic-api-key"), !apiKey.isEmpty else {
                 state = .error("No API key configured. Add your key in Settings.")
@@ -167,16 +151,9 @@ class ImportRecipeViewModel {
             let model = AnthropicAPIService.ClaudeModel(rawValue: claudeModelRawValue) ?? .sonnet
 
             state = .extractingRecipe
-            let totalBytes = selectedImages.reduce(0) { $0 + $1.data.count }
-            logger.debug("Importing recipe from \(self.selectedImages.count) photo(s) (\(totalBytes) bytes) using model \(model.rawValue)")
 
             let service = AnthropicAPIService()
-            let rawMarkdown = try await service.extractRecipeFromImages(
-                images: selectedImages,
-                apiKey: apiKey,
-                model: model,
-                tagPrompt: tagPrompt
-            )
+            let rawMarkdown = try await extract(service, apiKey, model)
 
             #if DEBUG
             logger.debug("Raw Claude response (\(rawMarkdown.count) chars):\n\(rawMarkdown)")
@@ -191,7 +168,7 @@ class ImportRecipeViewModel {
             let trimmed = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
             guard trimmed.hasPrefix("# ") else {
                 logger.error("Response does not start with '# ' — not a valid recipe heading")
-                state = .error("Could not extract a recipe from this photo. Try a different photo.")
+                state = .error("Could not extract a recipe from \(failureContext). \(fallbackHint)")
                 return
             }
 
@@ -201,7 +178,7 @@ class ImportRecipeViewModel {
             state = .error(error.errorDescription ?? "An unknown error occurred.")
         } catch {
             logger.error("Import failed: \(error.localizedDescription)")
-            state = .error("Could not extract a recipe from this photo. Try a different photo.")
+            state = .error("Could not extract a recipe from \(failureContext). \(fallbackHint)")
         }
     }
 

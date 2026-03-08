@@ -8,6 +8,39 @@
 import Foundation
 import RecipeMD
 
+/// Shared quantity parser for ingredients and yields.
+/// Handles integers, decimals, ASCII fractions (1/2), and unicode fractions (½).
+enum QuantityParser {
+    static func parse(_ str: String) -> Double? {
+        // Single unicode fraction like "½"
+        if str.count == 1, let first = str.first, let value = UnicodeFractions.value(for: first) {
+            return value
+        }
+
+        // Mixed number with unicode fraction like "1½"
+        if let last = str.last, let fractionValue = UnicodeFractions.value(for: last) {
+            let wholeStr = String(str.dropLast())
+            if let whole = Double(wholeStr) {
+                return whole + fractionValue
+            }
+        }
+
+        // ASCII fractions like "1/2"
+        if str.contains("/") {
+            let parts = str.split(separator: "/")
+            if parts.count == 2,
+               let numerator = Double(parts[0]),
+               let denominator = Double(parts[1]),
+               denominator != 0 {
+                return numerator / denominator
+            }
+        }
+
+        // Integers and decimals
+        return Double(str)
+    }
+}
+
 /// Represents an editable ingredient in the form
 struct EditableIngredient: Identifiable {
     let id: UUID
@@ -59,52 +92,22 @@ struct EditableIngredient: Identifiable {
         let parts = amountString.split(separator: " ", maxSplits: 1)
 
         if parts.count >= 2 {
-            // Has both quantity and unit (e.g., "2 cups")
             let quantityStr = String(parts[0])
             let unit = String(parts[1])
 
-            if let quantity = parseQuantity(quantityStr) {
+            if let quantity = QuantityParser.parse(quantityStr) {
                 return Amount(quantity, unit: unit)
             }
             return nil
         } else if parts.count == 1 {
             let firstPart = String(parts[0])
-            if let quantity = parseQuantity(firstPart) {
+            if let quantity = QuantityParser.parse(firstPart) {
                 return Amount(quantity, unit: nil)
             }
             return nil
         }
 
         return nil
-    }
-
-    /// Parse a quantity string (handles fractions and unicode fractions)
-    private func parseQuantity(_ str: String) -> Double? {
-        // Handle single unicode fraction like "½"
-        if str.count == 1, let first = str.first, let value = UnicodeFractions.value(for: first) {
-            return value
-        }
-
-        // Handle mixed number with unicode fraction like "1½"
-        if let last = str.last, let fractionValue = UnicodeFractions.value(for: last) {
-            let wholeStr = String(str.dropLast())
-            if let whole = Double(wholeStr) {
-                return whole + fractionValue
-            }
-        }
-
-        // Handle ASCII fractions like "1/2"
-        if str.contains("/") {
-            let fractionParts = str.split(separator: "/")
-            if fractionParts.count == 2,
-               let numerator = Double(fractionParts[0]),
-               let denominator = Double(fractionParts[1]),
-               denominator != 0 {
-                return numerator / denominator
-            }
-        }
-        // Handle integers and decimals
-        return Double(str)
     }
 
     /// Check if this ingredient has valid content
@@ -412,7 +415,7 @@ class RecipeFormViewModel: Identifiable {
 
     /// Toggle a tag in/out of the selected set
     func toggleTag(_ tag: String) {
-        let normalized = tag.lowercased()
+        let normalized = tag.normalizedTag
         if selectedTags.contains(normalized) {
             selectedTags.remove(normalized)
         } else {
@@ -422,9 +425,7 @@ class RecipeFormViewModel: Identifiable {
 
     /// Add a custom tag from customTagText, then clear the text field
     func addCustomTag() {
-        let normalized = customTagText
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
+        let normalized = customTagText.normalizedTag
         guard !normalized.isEmpty else { return }
         selectedTags.insert(normalized)
         customTagText = ""
@@ -623,7 +624,7 @@ class RecipeFormViewModel: Identifiable {
 
         title = recipe.title
         descriptionText = recipe.description ?? ""
-        selectedTags = Set(recipe.tags.map { $0.lowercased() })
+        selectedTags = Set(recipe.tags.map { $0.normalizedTag })
         instructionGroups = parseInstructionsToGroups(recipe.instructions ?? "")
 
         // Format yields from Yield type
@@ -641,14 +642,12 @@ class RecipeFormViewModel: Identifiable {
         for group in groups {
             let editableIngredients = group.ingredients.map { EditableIngredient(from: $0) }
 
-            if group.title != nil && !group.title!.isEmpty {
-                // Named group
+            if let title = group.title, !title.isEmpty {
                 named.append(EditableIngredientGroup(
-                    title: group.title!,
+                    title: title,
                     ingredients: editableIngredients.isEmpty ? [EditableIngredient()] : editableIngredients
                 ))
             } else {
-                // Ungrouped
                 ungrouped.append(contentsOf: editableIngredients)
             }
         }
@@ -758,13 +757,14 @@ class RecipeFormViewModel: Identifiable {
         }
 
         // Build the library Recipe
+        let instructions = serializeInstructionGroups()
         let recipe = Recipe(
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             description: descriptionText.isEmpty ? nil : descriptionText,
             tags: tags,
             yield: yield,
             ingredientGroups: allGroups,
-            instructions: serializeInstructionGroups().isEmpty ? nil : serializeInstructionGroups()
+            instructions: instructions.isEmpty ? nil : instructions
         )
 
         // Get file path from original recipe or use placeholder
@@ -792,7 +792,7 @@ class RecipeFormViewModel: Identifiable {
         )
     }
 
-    /// Parse a yield amount string (e.g., "4 servings", "2 loaves")
+    /// Parse a yield amount string (e.g., "4 servings", "1/2 dozen")
     private func parseYieldAmount(_ str: String) -> Amount {
         let parts = str.split(separator: " ", maxSplits: 1)
 
@@ -800,12 +800,11 @@ class RecipeFormViewModel: Identifiable {
             let quantityStr = String(parts[0])
             let unit = String(parts[1])
 
-            if let quantity = Double(quantityStr) {
+            if let quantity = QuantityParser.parse(quantityStr) {
                 return Amount(quantity, unit: unit)
             }
         } else if parts.count == 1 {
-            let firstPart = String(parts[0])
-            if let quantity = Double(firstPart) {
+            if let quantity = QuantityParser.parse(String(parts[0])) {
                 return Amount(quantity, unit: nil)
             }
         }

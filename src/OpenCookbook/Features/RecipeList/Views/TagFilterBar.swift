@@ -61,46 +61,17 @@ struct TagFilterBar: View {
 /// Individual tag chip button
 struct TagChip: View {
 
-    // MARK: - Properties
-
     let tagInfo: TagInfo
     let isSelected: Bool
     var onTap: () -> Void
 
-    // MARK: - Body
-
     var body: some View {
-        Button {
-            onTap()
-        } label: {
-            HStack(spacing: 4) {
-                Text(tagInfo.name)
-                Text("\(tagInfo.count)")
-                    .font(.caption2)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(
-                        isSelected
-                            ? Color.white.opacity(0.3)
-                            : Color(.systemGray4)
-                    )
-                    .clipShape(Capsule())
-            }
-            .font(.subheadline)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(isSelected ? Color.accentColor : Color(.systemGray6))
-            .foregroundStyle(isSelected ? .white : .primary)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .strokeBorder(
-                        isSelected ? Color.clear : Color(.systemGray4),
-                        lineWidth: 1
-                    )
-            )
-        }
-        .buttonStyle(.plain)
+        SelectableChip(
+            tagInfo.name,
+            badge: "\(tagInfo.count)",
+            isSelected: isSelected,
+            action: onTap
+        )
         .accessibilityLabel("\(tagInfo.name), \(tagInfo.count) recipes")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
