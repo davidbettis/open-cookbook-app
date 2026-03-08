@@ -131,10 +131,13 @@ final class RecipeSearchService {
             }
         }
 
-        // Sort tags alphabetically and create TagInfo objects
+        // Sort tags by count descending, then alphabetically for ties
         availableTags = tagCounts
             .map { TagInfo(name: $0.key, count: $0.value) }
-            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            .sorted {
+                if $0.count != $1.count { return $0.count > $1.count }
+                return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
     }
 
     /// Apply search and tag filters to the recipe collection
