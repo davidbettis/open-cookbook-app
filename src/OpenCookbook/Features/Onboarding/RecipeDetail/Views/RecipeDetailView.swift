@@ -129,9 +129,6 @@ struct RecipeDetailView: View {
                     tagFrequencies: RecipeSearchService.computeTagFrequencies(from: store.recipes),
                     onSave: { savedRecipeFile in
                         currentRecipeFile = savedRecipeFile
-                        Task {
-                            await loadRecipeContent()
-                        }
                     }
                 )
             }
@@ -172,6 +169,13 @@ struct RecipeDetailView: View {
             loadError = nil
             currentRecipeFile = recipeFile
             await loadRecipeContent()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .recipeDidUpdate)) { notification in
+            guard let updatedID = notification.object as? UUID,
+                  updatedID == recipeFile.id else { return }
+            Task {
+                await loadRecipeContent()
+            }
         }
         .overlay(alignment: .bottom) {
             if showCopiedToast {

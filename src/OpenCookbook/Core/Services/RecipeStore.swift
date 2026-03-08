@@ -9,6 +9,11 @@ import Foundation
 import RecipeMD
 import SwiftUI
 
+extension Notification.Name {
+    /// Posted when a recipe's content is updated. The notification's `object` is the recipe's `UUID`.
+    static let recipeDidUpdate = Notification.Name("recipeDidUpdate")
+}
+
 /// Central store for managing the recipe collection
 @MainActor
 @Observable
@@ -198,6 +203,8 @@ class RecipeStore {
 
         // Update cache
         recipeCache[fileURL] = CachedRecipeFile(recipeFile: updatedRecipeFile, modificationDate: Date())
+
+        NotificationCenter.default.post(name: .recipeDidUpdate, object: recipeFile.id)
         }
     }
 
@@ -293,6 +300,8 @@ class RecipeStore {
 
         // Update cache
         recipeCache[fileURL] = CachedRecipeFile(recipeFile: updatedRecipeFile, modificationDate: Date())
+
+        NotificationCenter.default.post(name: .recipeDidUpdate, object: updatedRecipeFile.id)
         }
     }
 
