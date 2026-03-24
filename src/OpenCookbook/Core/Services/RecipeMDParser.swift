@@ -47,39 +47,4 @@ final class RecipeFileParser {
             fileModifiedDate: modDate
         )
     }
-
-    /// Parse a RecipeMD file, returning a RecipeFile with error info if parsing fails
-    /// - Parameter url: URL of the .md file to parse
-    /// - Returns: A RecipeFile instance (may have parseError set if partial parse)
-    func parseWithFallback(from url: URL) -> RecipeFile? {
-        guard FileManager.default.fileExists(atPath: url.path) else {
-            return nil
-        }
-
-        guard let content = try? String(contentsOf: url, encoding: .utf8) else {
-            return nil
-        }
-
-        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
-        let modDate = attributes?[.modificationDate] as? Date
-
-        do {
-            let recipe = try parser.parse(content)
-            return RecipeFile(
-                filePath: url,
-                recipe: recipe,
-                fileModifiedDate: modDate
-            )
-        } catch {
-            // Create a minimal recipe from filename if parsing fails completely
-            let filename = url.deletingPathExtension().lastPathComponent
-            let fallbackRecipe = Recipe(title: filename)
-            return RecipeFile(
-                filePath: url,
-                recipe: fallbackRecipe,
-                fileModifiedDate: modDate,
-                parseError: .invalidFormat(reason: error.localizedDescription)
-            )
-        }
-    }
 }

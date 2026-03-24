@@ -2,7 +2,7 @@
 //  RecipeDetailSplitContent.swift
 //  OpenCookbook
 //
-//  Side-by-side ingredients (25%) and instructions (75%) for iPad
+//  Side-by-side ingredients (33%) and instructions (67%) for iPad
 //
 
 import MarkdownUI
@@ -32,13 +32,13 @@ struct RecipeDetailSplitContent: View {
     var body: some View {
         GeometryReader { geometry in
             HStack(spacing: 0) {
-                // Left panel: Ingredients (25%)
+                // Left panel: Ingredients (33%)
                 ingredientsPanel
                     .frame(width: geometry.size.width * ingredientsProportion)
 
                 Divider()
 
-                // Right panel: Instructions (75%)
+                // Right panel: Instructions (67%)
                 instructionsPanel
                     .frame(maxWidth: .infinity)
             }

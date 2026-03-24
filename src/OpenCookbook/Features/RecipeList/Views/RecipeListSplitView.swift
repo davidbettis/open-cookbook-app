@@ -299,58 +299,6 @@ struct RecipeListSplitView: View {
     }
 }
 
-// MARK: - Placeholder Detail View
-
-/// Temporary placeholder until F004 implements full detail view
-struct RecipeDetailPlaceholder: View {
-
-    let recipeFile: RecipeFile
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "book.pages")
-                .font(.system(size: 60))
-                .foregroundStyle(.secondary)
-
-            Text(recipeFile.title)
-                .font(.title)
-                .fontWeight(.semibold)
-
-            if let description = recipeFile.description {
-                Text(description)
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
-            }
-
-            if !recipeFile.tags.isEmpty {
-                HStack {
-                    ForEach(recipeFile.tags, id: \.self) { tag in
-                        Text(tag)
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.blue.opacity(0.2))
-                            .foregroundStyle(.blue)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
-                    }
-                }
-            }
-
-            Spacer()
-                .frame(height: 32)
-
-            Text("Full recipe view coming in F004")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-        }
-        .padding()
-        .navigationTitle(recipeFile.title)
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
 // MARK: - Previews
 
 #Preview("With Recipes") {

@@ -45,35 +45,19 @@ struct TagFilterBar: View {
 
                 // Tag chips
                 ForEach(tags) { tagInfo in
-                    TagChip(
-                        tagInfo: tagInfo,
+                    SelectableChip(
+                        tagInfo.name,
+                        badge: "\(tagInfo.count)",
                         isSelected: selectedTags.contains(tagInfo.name),
-                        onTap: { onTagTap(tagInfo.name) }
+                        action: { onTagTap(tagInfo.name) }
                     )
+                    .accessibilityLabel("\(tagInfo.name), \(tagInfo.count) recipes")
+                    .accessibilityAddTraits(selectedTags.contains(tagInfo.name) ? .isSelected : [])
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 4)
         }
-    }
-}
-
-/// Individual tag chip button
-struct TagChip: View {
-
-    let tagInfo: TagInfo
-    let isSelected: Bool
-    var onTap: () -> Void
-
-    var body: some View {
-        SelectableChip(
-            tagInfo.name,
-            badge: "\(tagInfo.count)",
-            isSelected: isSelected,
-            action: onTap
-        )
-        .accessibilityLabel("\(tagInfo.name), \(tagInfo.count) recipes")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
 

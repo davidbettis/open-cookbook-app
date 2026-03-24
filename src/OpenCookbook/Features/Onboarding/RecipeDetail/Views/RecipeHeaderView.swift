@@ -90,10 +90,6 @@ private struct YieldView: View {
     }
 }
 
-// MARK: - Flow Layout
-
-// FlowLayout is defined in TagPickerView.swift and shared across the app
-
 // MARK: - Previews
 
 #Preview("Full Header") {

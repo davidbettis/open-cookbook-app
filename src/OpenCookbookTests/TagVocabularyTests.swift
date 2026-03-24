@@ -12,7 +12,7 @@ import Testing
 @Suite("TagVocabulary")
 struct TagVocabularyTests {
 
-    @Test("All built-in tags total 39")
+    @Test("All built-in tags total 38")
     func allBuiltInTagsCount() {
         #expect(TagVocabulary.allBuiltInTags.count == 38)
     }

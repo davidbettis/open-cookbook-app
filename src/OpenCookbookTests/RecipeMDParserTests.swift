@@ -147,36 +147,6 @@ struct RecipeMDParserTests {
         try? FileManager.default.removeItem(at: fileURL)
     }
 
-    // MARK: - Parse With Fallback Tests
-
-    @Test("Parse with fallback returns RecipeFile with parseError for invalid content")
-    func parseWithFallbackReturnsError() async throws {
-        let tempDir = FileManager.default.temporaryDirectory
-        let fileURL = tempDir.appendingPathComponent("invalid_\(UUID().uuidString).md")
-
-        let content = """
-        No title here, just text.
-        """
-
-        try content.write(to: fileURL, atomically: true, encoding: .utf8)
-
-        let recipeFile = parser.parseWithFallback(from: fileURL)
-
-        #expect(recipeFile != nil)
-        #expect(recipeFile?.parseError != nil)
-
-        try? FileManager.default.removeItem(at: fileURL)
-    }
-
-    @Test("Parse with fallback returns nil for non-existent file")
-    func parseWithFallbackNonExistentFile() async throws {
-        let fakeURL = URL(fileURLWithPath: "/tmp/nonexistent_recipe_\(UUID().uuidString).md")
-
-        let recipeFile = parser.parseWithFallback(from: fakeURL)
-
-        #expect(recipeFile == nil)
-    }
-
     // MARK: - Ingredient Parsing Tests
 
     @Test("Parse recipe with ingredients")

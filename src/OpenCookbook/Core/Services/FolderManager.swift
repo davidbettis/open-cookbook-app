@@ -100,7 +100,7 @@ final class FolderManager {
     }
 
     /// Whether the app is running on macOS (including iOS apps on Mac)
-    private var isRunningOnMac: Bool {
+    private let isRunningOnMac: Bool = {
         #if os(macOS)
         return true
         #else
@@ -109,7 +109,7 @@ final class FolderManager {
         }
         return false
         #endif
-    }
+    }()
 
     /// Whether we're currently accessing the security-scoped resource
     private var isAccessingSecurityScopedResource = false
