@@ -1,5 +1,11 @@
 # Release History
 
+1.0.6
+- Add "Choose Files" button for importing recipe photos from disk on macOS
+- Add help text to Settings display options and import section
+- Widen iPad ingredient panel from 25% to 33% in split view
+- Sort tag filter chips by recipe count descending
+
 1.0.5
 - Support importing recipes from multiple photos (up to 5) for multi-page cookbook spreads, from both photo library and camera
 - Camera now offers "Take Another" after each capture to quickly photograph multiple pages
