@@ -62,14 +62,18 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Auto-number Instructions", isOn: $autoNumberInstructions)
+                } header: {
+                    Text("Display")
+                } footer: {
+                    Text("Instructions may not be numbered. Turn on to add numbering to all recipes.")
+                }
 
+                Section {
                     Picker("Amount Format", selection: $amountDisplayFormat) {
                         Text("Original").tag(AmountDisplayFormat.original.rawValue)
                         Text("Decimal").tag(AmountDisplayFormat.decimal.rawValue)
                         Text("Fraction").tag(AmountDisplayFormat.fraction.rawValue)
                     }
-                } header: {
-                    Text("Display")
                 } footer: {
                     Text("Choose how ingredient amounts are displayed. Original shows amounts as written in the recipe file.")
                 }
@@ -213,7 +217,7 @@ struct SettingsView: View {
         } header: {
             Text("Import Recipe")
         } footer: {
-            Text("Sign up for Claude and get a key at [platform.claude.com/settings/keys](https://platform.claude.com/settings/keys)")
+            Text("Open Cookbook uses Claude to import recipes from websites or images. Sign up for Claude and get a key at [platform.claude.com/settings/keys](https://platform.claude.com/settings/keys)")
         }
     }
 
