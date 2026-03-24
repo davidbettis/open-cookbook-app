@@ -91,6 +91,12 @@ enum AppError: LocalizedError {
 - Use Swift Testing framework (@Test, #expect)
 - Minimum 80% code coverage for business logic
 
+## macOS Support
+This app runs on Mac as "Designed for iPad" (not Mac Catalyst or native macOS). This means:
+- `#if os(macOS)` is **always false** — do NOT use it for Mac-specific behavior
+- Use `ProcessInfo.processInfo.isiOSAppOnMac` for runtime Mac detection instead
+- UIKit types like `UIImage` are available on Mac (no need for `#if canImport(UIKit)` guards)
+
 ## DO NOT
 - Write UITests during scaffolding phase
 - Use deprecated APIs (UIKit when SwiftUI suffices)

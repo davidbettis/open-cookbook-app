@@ -55,9 +55,14 @@ Both sources use the same extraction prompt (with minor source-specific preamble
 - [ ] Import is disabled when no API key is configured (shows guidance to visit Settings)
 
 ### Import Flow (Photo)
-- [ ] "Import from Photo" presents a sheet with options to take a photo or choose from library
-- [ ] Camera option uses `UIImagePickerController` (via `UIViewControllerRepresentable`) with `.camera` source
-- [ ] Photo library option uses `PhotosPicker` from PhotosUI framework with `maxSelectionCount: 5`
+- [ ] "Import from Photo" presents a sheet with platform-appropriate options:
+  - **iOS**: Camera button + Photo Library button (via `PhotosPicker`)
+  - **macOS**: "Choose Files" button only (via `.fileImporter()`, opens Finder picker for image files)
+- [ ] Camera option (iOS only) uses `UIImagePickerController` (via `UIViewControllerRepresentable`) with `.camera` source
+- [ ] Photo library option (iOS only) uses `PhotosPicker` from PhotosUI framework with `maxSelectionCount: 5`
+- [ ] **macOS only**: "Choose Files" button opens a Finder file picker (via `.fileImporter()`) allowing selection of image files (.jpg, .png, .heic, etc.) from disk
+- [ ] File picker allows multiple selection, respecting the same 5-photo maximum
+- [ ] Security-scoped resource access is used to read selected file URLs
 - [ ] User can select multiple photos (up to 5) for multi-page recipes (e.g., cookbook spreads)
 - [ ] Selected images are displayed as a scrollable row of thumbnails in the import sheet
 - [ ] Each thumbnail has an "x" button to remove it
@@ -385,8 +390,12 @@ Each menu item presents `ImportRecipeView` with the appropriate source pre-selec
 │ └───────┘ └───────┘ └───────┘      │
 │                                     │
 │ ┌───────────┐  ┌────────────────┐  │
-│ │  Camera   │  │ Photo Library  │  │  ← Two buttons (initial state)
+│ │  Camera   │  │ Photo Library  │  │  ← iOS only
 │ └───────────┘  └────────────────┘  │
+│                                     │
+│ ┌──────────────────────────────┐   │
+│ │        Choose Files          │   │  ← macOS only (Finder picker)
+│ └──────────────────────────────┘   │
 │                                     │
 │ ┌─────────────────────────────────┐ │
 │ │         Import Recipe           │ │  ← Disabled until ≥1 photo
@@ -396,9 +405,9 @@ Each menu item presents `ImportRecipeView` with the appropriate source pre-selec
 ```
 
 **States (Photo tab)**:
-- **No photos**: Camera and Photo Library buttons shown. Import button disabled.
+- **No photos**: Camera and Photo Library buttons shown (iOS); Choose Files button shown (macOS). Import button disabled.
 - **Photos selected**: Thumbnail row displayed with remove buttons and "+" to add more (up to 5). Import button enabled.
-- **Max photos reached**: "+" add-more button hidden. Camera/Library buttons still visible but disabled.
+- **Max photos reached**: "+" add-more button hidden. Camera/Library/Choose Files buttons still visible but disabled.
 - **Extracting**: ProgressView + status text. Buttons disabled.
 - **Success**: Sheet dismisses, `RecipeFormView` opens in `.add` mode with pre-populated fields.
 - **Error**: Alert with error message and "Try Again" / "Cancel" actions.
@@ -447,6 +456,13 @@ Identical to the existing website flow — no changes needed:
 - The app must include `NSCameraUsageDescription` in Info.plist: "OpenCookbook uses the camera to photograph recipes for import."
 - If camera permission is denied, hide the Camera button and only show Photo Library
 - Photo library access uses `PhotosPicker` which uses the system's limited access picker (no permission prompt needed on iOS 17+)
+
+### macOS File Picker
+- On macOS, a "Choose Files" button opens a Finder file picker via SwiftUI's `.fileImporter()` modifier
+- Allowed content types: `[.image]` (covers JPEG, PNG, HEIC, TIFF, etc.)
+- Multiple selection enabled, respecting the 5-photo maximum
+- Security-scoped resource access used to read selected file URLs
+- Selected files feed into the same `addImage()` pipeline as PhotosPicker selections
 
 ### Settings Section
 - No changes needed — the existing "Import Recipe" section already covers provider, model, and API key configuration
@@ -546,6 +562,21 @@ Identical to the existing website flow — no changes needed:
 2. Tap `+` and select "Import from Photo"
 3. Verify the Camera button is not shown
 4. Verify Photo Library button still works
+
+#### TC-085b: macOS — Import from files on disk
+1. On macOS, configure API key
+2. Tap `+` and select "Import from Photo"
+3. Verify "Choose Files" button is shown
+4. Verify Camera and Photo Library buttons are not shown
+5. Click "Choose Files" and select 1-2 image files from Finder
+6. Verify selected images appear as thumbnails
+7. Tap "Import Recipe" and verify extraction succeeds
+
+#### TC-085c: macOS — Choose Files respects photo limit
+1. On macOS, select 4 images via "Choose Files"
+2. Click "Choose Files" again and select 3 more images from Finder
+3. Verify only 1 additional image is added (reaching the 5-photo max)
+4. Verify "Choose Files" button becomes disabled
 
 #### TC-086: Switch between Website and Photo tabs
 1. Open import sheet (from either menu item)

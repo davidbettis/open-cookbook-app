@@ -25,6 +25,7 @@ struct ImportRecipeView: View {
     @State private var selectedUIImages: [UIImage] = []
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var showCamera = false
+    @State private var showFileImporter = false
 
     var body: some View {
         NavigationStack {
@@ -87,6 +88,19 @@ struct ImportRecipeView: View {
                 )
                 .ignoresSafeArea()
             }
+            .fileImporter(
+                isPresented: $showFileImporter,
+                allowedContentTypes: [.image],
+                allowsMultipleSelection: true
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    loadImages(from: urls)
+                case .failure(let error):
+                    errorMessage = error.localizedDescription
+                    showError = true
+                }
+            }
             .onAppear {
                 viewModel.source = initialSource
                 viewModel.tagPrompt = tagPrompt
@@ -139,27 +153,37 @@ struct ImportRecipeView: View {
             }
 
             HStack {
-                #if !targetEnvironment(simulator)
-                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                if ProcessInfo.processInfo.isiOSAppOnMac {
                     Button {
-                        showCamera = true
+                        showFileImporter = true
                     } label: {
-                        Label("Camera", systemImage: "camera")
+                        Label("Choose Files", systemImage: "folder")
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!viewModel.canAddMorePhotos || viewModel.isImporting)
+                } else {
+                    #if !targetEnvironment(simulator)
+                    if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                        Button {
+                            showCamera = true
+                        } label: {
+                            Label("Camera", systemImage: "camera")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(!viewModel.canAddMorePhotos || viewModel.isImporting)
+                    }
+                    #endif
+
+                    PhotosPicker(
+                        selection: $selectedPhotoItems,
+                        maxSelectionCount: max(1, ImportRecipeViewModel.maxPhotos - selectedUIImages.count),
+                        matching: .images
+                    ) {
+                        Label("Photo Library", systemImage: "photo.on.rectangle")
                     }
                     .buttonStyle(.bordered)
                     .disabled(!viewModel.canAddMorePhotos || viewModel.isImporting)
                 }
-                #endif
-
-                PhotosPicker(
-                    selection: $selectedPhotoItems,
-                    maxSelectionCount: max(1, ImportRecipeViewModel.maxPhotos - selectedUIImages.count),
-                    matching: .images
-                ) {
-                    Label("Photo Library", systemImage: "photo.on.rectangle")
-                }
-                .buttonStyle(.bordered)
-                .disabled(!viewModel.canAddMorePhotos || viewModel.isImporting)
             }
             .frame(maxWidth: .infinity, alignment: .center)
 
@@ -172,7 +196,11 @@ struct ImportRecipeView: View {
             .buttonStyle(.borderedProminent)
             .disabled(selectedUIImages.isEmpty || viewModel.isImporting)
         } header: {
-            Text("Take photos of a recipe or choose from your library. Select multiple photos for multi-page recipes.")
+            if ProcessInfo.processInfo.isiOSAppOnMac {
+                Text("Choose image files of a recipe. Select multiple files for multi-page recipes.")
+            } else {
+                Text("Take photos of a recipe or choose from your library. Select multiple photos for multi-page recipes.")
+            }
         }
     }
 
@@ -225,6 +253,19 @@ struct ImportRecipeView: View {
             }
         }
         selectedPhotoItems = []
+    }
+
+    private func loadImages(from urls: [URL]) {
+        for url in urls {
+            guard viewModel.canAddMorePhotos else { break }
+            let didAccess = url.startAccessingSecurityScopedResource()
+            defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+
+            guard let data = try? Data(contentsOf: url),
+                  let image = UIImage(data: data) else { continue }
+            selectedUIImages.append(image)
+            viewModel.addImage(image)
+        }
     }
 
     private func removePhoto(at index: Int) {
