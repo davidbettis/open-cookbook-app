@@ -161,27 +161,29 @@ Factor the recipe formatting instructions into a shared constant used by both me
 - **Photo preamble (single)**: `"Extract the recipe from this photo into structured markdown format.\n\n"`
 - **Photo preamble (multiple)**: `"These photos show different parts of the same recipe (e.g., a multi-page cookbook spread). Combine them into a single complete recipe in structured markdown format.\n\n"`
 
-The formatting instructions (steps 1–8, rules) remain identical:
+The formatting instructions (steps 1–9, rules) remain identical:
 
 ```
 Format the recipe with these exact specifications:
 1. Title: Use H1 heading (single #)
-2. Tags: On the next line, add italicized tags separated by commas (e.g., asian, slow-cooker)
-3. Servings: Bold text showing servings and portion size (e.g., ** 6 Servings, 1.5 cups **)
-4. Separator: Add a horizontal rule (---)
-5. Ingredients List:
+2. Description: A brief 1-2 sentence description of the dish on the next line
+3. Tags: On the next line, add italicized tags separated by commas (e.g., *asian, slow-cooker*)
+4. Servings: Bold text showing servings and portion size (e.g., **6 Servings, 1.5 cups**)
+5. Separator: Add a horizontal rule (---)
+6. Ingredients List:
    * Each ingredient on its own line starting with a dash
-   * Italicize quantities (e.g., 2½ lb, ½ c, 1 T)
+   * Italicize quantities (e.g., *2 1/2 lb*, *1/2 c*, *1 T*)
+   * Use slash fractions (1/2, 1/4, 3/4) instead of unicode fractions
    * Follow quantity with ingredient description
    * Maintain original measurements and abbreviations
    * Do not include a heading that says "Ingredients" for this section.
-6. Separator: Add another horizontal rule (---)
-7. Instructions:
+7. Separator: Add another horizontal rule (---)
+8. Instructions:
    * Number each step
    * Use clear, sequential formatting
    * Maintain original wording and details
    * Do not include a heading that says "Instructions" for this section.
-8. Attribution: If source information is provided, add it at the end in the format: "*Attribution:* [Author Name], [URL]"
+9. Attribution: If source information is provided, add it at the end in the format: "*Attribution:* [Author Name], [URL]"
 Preserve all recipe details including ingredient amounts, cooking times, temperatures, and special notes. Format any garnishes, serving suggestions, or optional ingredients as separate ingredient lines.
 
 Important rules:
