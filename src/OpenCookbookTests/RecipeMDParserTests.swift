@@ -178,6 +178,89 @@ struct RecipeMDParserTests {
         try? FileManager.default.removeItem(at: fileURL)
     }
 
+    @Test("Parse ingredient with parenthetical metric conversion extracts supplemental amount")
+    func parseIngredientWithParentheticalConversion() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileURL = tempDir.appendingPathComponent("supplemental_\(UUID().uuidString).md")
+
+        let content = """
+        # Test Recipe
+
+        ---
+
+        - *1 oz (28 g)* water
+        - *2 T (30 ml)* peanut oil
+        - *1 tsp (3 g)* red Sichuan peppercorns
+
+        ---
+
+        Mix together.
+        """
+
+        try content.write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let recipeFile = try parser.parse(from: fileURL)
+        let ingredients = recipeFile.allIngredients
+
+        #expect(ingredients[0].amount?.amount == 1.0)
+        #expect(ingredients[0].amount?.unit == "oz")
+        #expect(ingredients[0].supplementalAmount?.amount == 28.0)
+        #expect(ingredients[0].supplementalAmount?.unit == "g")
+        #expect(ingredients[0].name == "water")
+
+        #expect(ingredients[1].amount?.amount == 2.0)
+        #expect(ingredients[1].amount?.unit == "T")
+        #expect(ingredients[1].supplementalAmount?.amount == 30.0)
+        #expect(ingredients[1].supplementalAmount?.unit == "ml")
+        #expect(ingredients[1].name == "peanut oil")
+
+        #expect(ingredients[2].amount?.amount == 1.0)
+        #expect(ingredients[2].amount?.unit == "tsp")
+        #expect(ingredients[2].supplementalAmount?.amount == 3.0)
+        #expect(ingredients[2].supplementalAmount?.unit == "g")
+        #expect(ingredients[2].name == "red Sichuan peppercorns")
+
+        try? FileManager.default.removeItem(at: fileURL)
+    }
+
+    @Test("Parse normal ingredients still work with supplemental amounts enabled")
+    func parseNormalIngredientsUnaffected() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+        let fileURL = tempDir.appendingPathComponent("normal_\(UUID().uuidString).md")
+
+        let content = """
+        # Test Recipe
+
+        ---
+
+        - *2 cups* flour
+        - *500 g* sugar
+        - *3* eggs
+        - butter
+
+        ---
+
+        Mix together.
+        """
+
+        try content.write(to: fileURL, atomically: true, encoding: .utf8)
+
+        let recipeFile = try parser.parse(from: fileURL)
+        let ingredients = recipeFile.allIngredients
+
+        #expect(ingredients[0].amount?.unit == "cups")
+        #expect(ingredients[0].name == "flour")
+        #expect(ingredients[1].amount?.unit == "g")
+        #expect(ingredients[1].name == "sugar")
+        #expect(ingredients[2].amount?.amount == 3.0)
+        #expect(ingredients[2].amount?.unit == nil)
+        #expect(ingredients[2].name == "eggs")
+        #expect(ingredients[3].amount == nil)
+        #expect(ingredients[3].name == "butter")
+
+        try? FileManager.default.removeItem(at: fileURL)
+    }
+
     @Test("Parse recipe with ingredient groups")
     func parseRecipeWithIngredientGroups() async throws {
         let tempDir = FileManager.default.temporaryDirectory

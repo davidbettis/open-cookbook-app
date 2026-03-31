@@ -15,8 +15,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/davidbettis/recipemd-swift",
       "state" : {
-        "revision" : "8dfc0fe388c67f8710787343933ff3528c7aa533",
-        "version" : "1.0.0"
+        "revision" : "633942cb757a17ccb8b8bd764e05652d635fd3a4"
       }
     },
     {

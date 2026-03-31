@@ -11,7 +11,7 @@ import RecipeMD
 /// Parses RecipeMD files into RecipeFile instances
 /// Uses the RecipeMD library for parsing and wraps results with file metadata
 final class RecipeFileParser {
-    private let parser = RecipeMDParser()
+    private let parser = RecipeMDParser(options: ParserOptions(extractSupplementalAmounts: true))
 
     // MARK: - Public Methods
 

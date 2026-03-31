@@ -137,27 +137,32 @@ class RecipeStore {
 
     /// Update an existing recipe
     /// - Parameter recipeFile: The recipe file to update (uses existing filePath)
+    /// - Returns: The updated recipe file after re-parsing from disk
     /// - Throws: RecipeWriteError if update fails
-    func updateRecipe(_ recipeFile: RecipeFile) async throws {
+    @discardableResult
+    func updateRecipe(_ recipeFile: RecipeFile) async throws -> RecipeFile {
         isSaving = true
         defer { isSaving = false }
 
         let fileURL = recipeFile.filePath
 
-        try fileURL.withSecurityScopedAccess {
+        return try fileURL.withSecurityScopedAccess {
             try verifyFileExists(at: fileURL)
             let markdown = serializer.serialize(recipeFile)
             try writeMarkdown(markdown, to: fileURL)
 
+            // Re-parse the written file so the parser can extract supplemental amounts
+            let reparsed = try parseWrittenFile(at: fileURL)
             let updatedRecipeFile = RecipeFile(
                 id: recipeFile.id,
                 filePath: fileURL,
-                recipe: recipeFile.recipe,
+                recipe: reparsed.recipe,
                 fileModifiedDate: Date()
             )
 
             replaceInStore(updatedRecipeFile)
             NotificationCenter.default.post(name: .recipeDidUpdate, object: recipeFile.id)
+            return updatedRecipeFile
         }
     }
 
@@ -194,10 +199,19 @@ class RecipeStore {
         try filePath.withSecurityScopedAccess {
             try verifyFileExists(at: filePath)
             try writeMarkdown(markdown, to: filePath)
-            let updatedRecipeFile = try parseWrittenFile(at: filePath)
+            let reparsed = try parseWrittenFile(at: filePath)
+
+            // Preserve the original recipe's ID so views can find it
+            let originalID = recipes.first(where: { $0.filePath == filePath })?.id ?? reparsed.id
+            let updatedRecipeFile = RecipeFile(
+                id: originalID,
+                filePath: filePath,
+                recipe: reparsed.recipe,
+                fileModifiedDate: Date()
+            )
 
             replaceInStore(updatedRecipeFile)
-            NotificationCenter.default.post(name: .recipeDidUpdate, object: updatedRecipeFile.id)
+            NotificationCenter.default.post(name: .recipeDidUpdate, object: originalID)
         }
     }
 

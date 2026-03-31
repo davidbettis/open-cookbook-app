@@ -21,47 +21,56 @@ struct IngredientRowView: View {
     let onTabFromName: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Amount field (narrow)
-            TextField("Amount", text: $ingredient.amount)
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
-                .frame(width: 100)
-                .focused(focusedField, equals: .amount(ingredient.id))
-                .accessibilityLabel("Ingredient amount")
-                .accessibilityHint("Enter quantity and unit, like 2 cups")
-                .onSubmit {
-                    focusedField.wrappedValue = .name(ingredient.id)
-                }
-                .onKeyPress(.tab) {
-                    focusedField.wrappedValue = .name(ingredient.id)
-                    return .handled
-                }
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
+                // Amount field (narrow)
+                TextField("Amount", text: $ingredient.amount)
+                    .textFieldStyle(.roundedBorder)
+                    .textInputAutocapitalization(.never)
+                    .frame(width: 100)
+                    .focused(focusedField, equals: .amount(ingredient.id))
+                    .accessibilityLabel("Ingredient amount")
+                    .accessibilityHint("Enter quantity and unit, like 2 cups")
+                    .onSubmit {
+                        focusedField.wrappedValue = .name(ingredient.id)
+                    }
+                    .onKeyPress(.tab) {
+                        focusedField.wrappedValue = .name(ingredient.id)
+                        return .handled
+                    }
 
-            // Name field (wide)
-            TextField("Ingredient name", text: $ingredient.name)
-                .textFieldStyle(.roundedBorder)
-                .textInputAutocapitalization(.never)
-                .focused(focusedField, equals: .name(ingredient.id))
-                .accessibilityLabel("Ingredient name")
-                .accessibilityHint("Enter the ingredient name")
-                .onSubmit {
-                    onTabFromName()
-                }
-                .onKeyPress(.tab) {
-                    onTabFromName()
-                    return .handled
-                }
+                // Name field (wide)
+                TextField("Ingredient name", text: $ingredient.name)
+                    .textFieldStyle(.roundedBorder)
+                    .textInputAutocapitalization(.never)
+                    .focused(focusedField, equals: .name(ingredient.id))
+                    .accessibilityLabel("Ingredient name")
+                    .accessibilityHint("Enter the ingredient name")
+                    .onSubmit {
+                        onTabFromName()
+                    }
+                    .onKeyPress(.tab) {
+                        onTabFromName()
+                        return .handled
+                    }
 
-            // Delete button
-            Button(role: .destructive) {
-                onDelete()
-            } label: {
-                Image(systemName: "minus.circle.fill")
-                    .foregroundStyle(.red)
+                // Delete button
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove ingredient")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Remove ingredient")
+
+            if ingredient.hasUnparseableAmount {
+                Text("Amount needs a space between number and unit (e.g., \"2 cups\" not \"2cups\"). This amount won't scale with portions.")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .padding(.leading, 4)
+            }
         }
     }
 }

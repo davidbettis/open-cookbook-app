@@ -82,6 +82,10 @@ private struct IngredientRowDisplayView: View {
     private var displayText: String {
         if let amount = ingredient.amount {
             let scaledAmount = amount.formattedScaled(by: portionMultiplier, format: amountFormat)
+            if let supplemental = ingredient.supplementalAmount {
+                let scaledSupplemental = supplemental.formattedScaled(by: portionMultiplier, format: amountFormat)
+                return "\(scaledAmount) (\(scaledSupplemental)) \(ingredient.name)"
+            }
             return "\(scaledAmount) \(ingredient.name)"
         }
         return ingredient.name

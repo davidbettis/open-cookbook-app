@@ -12,6 +12,7 @@ import RecipeMD
 /// Uses the RecipeMD library's generator
 final class RecipeFileSerializer {
     private let generator = RecipeMDGenerator()
+    private let generatorOptions = GeneratorOptions(includeSupplementalAmounts: true)
 
     // MARK: - Public Methods
 
@@ -19,13 +20,13 @@ final class RecipeFileSerializer {
     /// - Parameter recipe: The recipe to serialize
     /// - Returns: Valid RecipeMD markdown string
     func serialize(_ recipe: Recipe) -> String {
-        return generator.generate(recipe)
+        return generator.generate(recipe, options: generatorOptions)
     }
 
     /// Serialize a RecipeFile to RecipeMD markdown format
     /// - Parameter recipeFile: The recipe file to serialize
     /// - Returns: Valid RecipeMD markdown string
     func serialize(_ recipeFile: RecipeFile) -> String {
-        return generator.generate(recipeFile.recipe)
+        return generator.generate(recipeFile.recipe, options: generatorOptions)
     }
 }

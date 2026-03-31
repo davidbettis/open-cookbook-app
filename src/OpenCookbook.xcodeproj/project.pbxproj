@@ -606,8 +606,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/davidbettis/recipemd-swift";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.0.0;
+				kind = revision;
+				revision = 633942cb757a17ccb8b8bd764e05652d635fd3a4;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

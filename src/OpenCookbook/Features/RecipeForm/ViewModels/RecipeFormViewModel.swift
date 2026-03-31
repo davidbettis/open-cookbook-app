@@ -58,9 +58,9 @@ struct EditableIngredient: Identifiable {
         self.id = UUID()
         self.name = ingredient.name
 
-        // Format amount from library Amount type
-        if let amt = ingredient.amount {
-            self.amount = amt.formatted
+        // Format amount from library Amount type, including supplemental if present
+        if let formatted = ingredient.formattedAmountWithSupplemental {
+            self.amount = formatted
         } else {
             self.amount = ""
         }
@@ -108,6 +108,14 @@ struct EditableIngredient: Identifiable {
         }
 
         return nil
+    }
+
+    /// Returns true if the amount field has text that can't be parsed as a numeric quantity.
+    /// This means the amount text will be folded into the ingredient name and won't scale.
+    var hasUnparseableAmount: Bool {
+        let trimmed = amount.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return false }
+        return parseAmount(trimmed) == nil
     }
 
     /// Check if this ingredient has valid content
@@ -382,7 +390,7 @@ class RecipeFormViewModel: Identifiable {
         saveError = nil
         defer { isSaving = false }
 
-        // Parse markdown to get recipe (needed for title in add mode and store updates)
+        // Parse markdown to get recipe title (needed for filename in add mode)
         let parser = RecipeMDParser()
         let recipe: Recipe
         do {
@@ -398,11 +406,13 @@ class RecipeFormViewModel: Identifiable {
                 savedRecipeFile = try await store.saveNewRecipeFromMarkdown(rawMarkdown, title: recipe.title, in: folder)
             case .edit(let originalFile):
                 try await store.updateRecipeFromMarkdown(rawMarkdown, filePath: originalFile.filePath)
-                savedRecipeFile = RecipeFile(
-                    filePath: originalFile.filePath,
-                    recipe: recipe,
-                    fileModifiedDate: Date()
-                )
+                // Read back from store to get the re-parsed version (with supplemental amounts)
+                savedRecipeFile = store.recipes.first(where: { $0.id == originalFile.id })
+                    ?? RecipeFile(
+                        filePath: originalFile.filePath,
+                        recipe: recipe,
+                        fileModifiedDate: Date()
+                    )
             }
             return savedRecipeFile
         } catch {
@@ -606,8 +616,7 @@ class RecipeFormViewModel: Identifiable {
             case .add:
                 savedRecipeFile = try await store.saveNewRecipe(recipeFile, in: folder)
             case .edit:
-                try await store.updateRecipe(recipeFile)
-                savedRecipeFile = recipeFile
+                savedRecipeFile = try await store.updateRecipe(recipeFile)
             }
             return savedRecipeFile
         } catch {
