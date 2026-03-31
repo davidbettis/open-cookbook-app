@@ -5,6 +5,9 @@
 - Add help text to Settings display options and import section
 - Widen iPad ingredient panel from 25% to 33% in split view
 - Sort tag filter chips by recipe count descending
+- Display and scale supplemental amounts (e.g., "1 oz (28 g)") alongside primary amounts when adjusting portions
+- Preserve supplemental amounts through recipe edit and markdown edit save cycles
+- Add validation warning in ingredient form when amount can't be parsed (e.g., missing space between number and unit)
 
 1.0.5
 - Support importing recipes from multiple photos (up to 5) for multi-page cookbook spreads, from both photo library and camera
