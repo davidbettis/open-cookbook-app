@@ -158,8 +158,8 @@ class AnthropicAPIService {
         Format the recipe with these exact specifications:
         1. Title: Use H1 heading (single #)
         2. Description: A brief 1-2 sentence description of the dish on the next line
-        3. Tags: On the next line, add italicized tags separated by commas (e.g., *asian, slow-cooker*)
-        4. Servings: Bold text showing servings and portion size (e.g., **6 Servings, 1.5 cups**)
+        3. Tags: Add a blank line, then italicized tags separated by commas (e.g., *asian, slow-cooker*)
+        4. Servings: Add a blank line, then bold text showing servings and portion size (e.g., **6 Servings, 1.5 cups**)
         5. Separator: Add a horizontal rule (---)
         6. Ingredients List:
            * Each ingredient on its own line starting with a dash

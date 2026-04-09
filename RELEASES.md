@@ -1,5 +1,8 @@
 # Release History
 
+1.0.7
+-
+
 1.0.6
 - Add "Choose Files" button for importing recipe photos from disk on macOS
 - Add help text to Settings display options and import section
