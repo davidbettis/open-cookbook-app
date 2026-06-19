@@ -1,7 +1,11 @@
 # Release History
 
+1.0.8
+- bug: app won't startup with large libraries. refresh the library based on filesystem events, don't block at startup
+- allow copying parts of of the recipe in the detail view
+
 1.0.7
--
+- Fixed a bug when importing recipes via photo/video
 
 1.0.6
 - Add "Choose Files" button for importing recipe photos from disk on macOS
