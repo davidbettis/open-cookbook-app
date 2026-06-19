@@ -42,6 +42,8 @@ struct RecipeDetailContent: View {
             // Reset portion to whole when navigating to a different recipe
             selectedPortion = .whole
         }
+        // Allow copying ingredients/instructions text (per line/paragraph)
+        .textSelection(.enabled)
     }
 
     // MARK: - iPad Layout
@@ -107,6 +109,7 @@ struct RecipeDetailContent: View {
                     : instructions
                 Markdown(displayInstructions)
                     .markdownTheme(.recipe)
+                    .textSelection(.enabled)
                     .padding(.horizontal)
             }
         }

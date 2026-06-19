@@ -114,6 +114,7 @@ struct RecipeDetailSplitContent: View {
                         : instructions
                     Markdown(displayInstructions)
                         .markdownTheme(.recipe)
+                        .textSelection(.enabled)
                 } else {
                     Text("No instructions provided")
                         .foregroundStyle(.secondary)
