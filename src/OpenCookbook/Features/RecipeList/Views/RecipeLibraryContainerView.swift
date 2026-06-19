@@ -37,13 +37,15 @@ struct RecipeLibraryContainerView: View {
             }
         }
         .environment(recipeStore)
-        .onAppear {
+        .task {
             if let folderURL = folderManager.selectedFolderURL {
-                recipeStore.loadRecipes(from: folderURL)
+                await recipeStore.loadRecipes(from: folderURL)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .recipesDidChange)) { _ in
-            recipeStore.refreshRecipes()
+            Task {
+                await recipeStore.refreshRecipes()
+            }
         }
     }
 }

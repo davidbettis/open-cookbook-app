@@ -150,16 +150,25 @@ struct RecipeListView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if viewModel.recipeStore.isLoading && viewModel.recipeStore.recipes.isEmpty {
-                    // Show loading state on initial load
-                    ProgressView("Loading recipes...")
-                        .padding()
+                if viewModel.recipeStore.recipes.isEmpty
+                    && (viewModel.recipeStore.isLoading || viewModel.recipeStore.pendingDownloadCount > 0) {
+                    // Initial load, or waiting on iCloud downloads before any recipe is available
+                    libraryLoadingView
                 } else if viewModel.recipeStore.recipes.isEmpty && !viewModel.searchService.hasActiveFilters {
                     // Show empty state (no recipes at all)
                     RecipeListEmptyState()
                 } else {
                     // Show recipe list with search/filter
                     recipeListWithSearch
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if !viewModel.recipeStore.recipes.isEmpty,
+                   viewModel.recipeStore.loadingProgress != nil || viewModel.recipeStore.pendingDownloadCount > 0 {
+                    RecipeLibraryLoadingBanner(
+                        progress: viewModel.recipeStore.loadingProgress,
+                        pendingDownloadCount: viewModel.recipeStore.pendingDownloadCount
+                    )
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -303,6 +312,13 @@ struct RecipeListView: View {
     }
 
     // MARK: - Subviews
+
+    private var libraryLoadingView: some View {
+        RecipeLibraryLoadingFullView(
+            progress: viewModel.recipeStore.loadingProgress,
+            pendingDownloadCount: viewModel.recipeStore.pendingDownloadCount
+        )
+    }
 
     /// Recipe list with search bar and tag filter
     private var recipeListWithSearch: some View {
@@ -568,9 +584,73 @@ struct RecipeListView: View {
     let store: RecipeStore = {
         let s = RecipeStore()
         s.isLoading = true
+        s.loadingProgress = RecipeStore.LoadingProgress(total: 87, loaded: 12)
         return s
     }()
 
     RecipeListView(viewModel: RecipeListViewModel(recipeStore: store))
         .environment(FolderManager())
+}
+
+// MARK: - Shared loading views (used by RecipeListView and RecipeListSplitView)
+
+/// Full-screen loading state shown while no recipes are available yet — either
+/// during the initial parse or while waiting on iCloud to deliver downloads.
+struct RecipeLibraryLoadingFullView: View {
+    let progress: RecipeStore.LoadingProgress?
+    let pendingDownloadCount: Int
+
+    var body: some View {
+        VStack(spacing: 12) {
+            if let progress, progress.total > 0 {
+                ProgressView(value: progress.fraction)
+                    .progressViewStyle(.linear)
+                    .padding(.horizontal)
+                Text("Loading \(progress.loaded) of \(progress.total) recipes…")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                ProgressView("Loading recipes…")
+            }
+            if pendingDownloadCount > 0 {
+                Label("Waiting for iCloud to download \(pendingDownloadCount) recipe(s)", systemImage: "icloud.and.arrow.down")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding()
+    }
+}
+
+/// Compact banner shown above the list while a load is in progress or iCloud
+/// downloads are still pending and at least one recipe is already visible.
+struct RecipeLibraryLoadingBanner: View {
+    let progress: RecipeStore.LoadingProgress?
+    let pendingDownloadCount: Int
+
+    var body: some View {
+        VStack(spacing: 4) {
+            if let progress {
+                ProgressView(value: progress.fraction)
+                    .progressViewStyle(.linear)
+                    .tint(.accentColor)
+            }
+            HStack {
+                if let progress {
+                    Text("Loading \(progress.loaded) of \(progress.total) recipes…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if pendingDownloadCount > 0 {
+                    Label("Waiting for iCloud (\(pendingDownloadCount))", systemImage: "icloud.and.arrow.down")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 6)
+        .background(.bar)
+    }
 }

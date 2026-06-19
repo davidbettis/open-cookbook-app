@@ -225,47 +225,87 @@ print("[ViewModel] hasActiveFilters: \(searchService.hasActiveFilters), count: \
 
 ---
 
-## Implementation Summary
+## v1 — Real-time monitoring & animated updates
 
-### Changes Made
-
-#### 1. RecipeFileMonitor.swift - Real File System Monitoring
-- Added `DispatchSource.makeFileSystemObjectSource` for real-time folder monitoring
-- Monitors for `.write`, `.delete`, `.rename`, and `.extend` events
-- Implemented debouncing (500ms) to batch rapid file system events
-- Proper cleanup of file descriptors and dispatch sources in `stopMonitoring()`
+### RecipeFileMonitor.swift
+- `DispatchSource.makeFileSystemObjectSource` for real-time folder monitoring
+- Monitors `.write`, `.delete`, `.rename`, `.extend` events
+- 500 ms debounce batches rapid file-system events
 - Security-scoped resource access for iCloud Drive folders
 
-#### 2. RecipeStore.swift - Animated UI Updates
-- Added `import SwiftUI` for animation support
-- Wrapped all array mutations in `withAnimation {}` blocks:
-  - `saveNewRecipe()` - smooth insertion animation
-  - `updateRecipe()` - smooth update animation
-  - `deleteRecipe()` - smooth removal animation
-  - `parseAllRecipes()` - smooth refresh animation
-- This ensures SwiftUI observes changes and animates them smoothly
+### RecipeStore.swift
+- `withAnimation {}` wraps all array mutations for smooth list transitions
+- `reloadFromMonitor()` reads files off the main actor via `Task.detached`
 
-#### 3. RecipeListView.swift & RecipeListSplitView.swift
-- `onSave` callback calls `viewModel.syncSearchService()` immediately
-- Combined with `onChange(of: viewModel.recipeStore.recipes)` observer
-- Ensures search index is updated as soon as recipe array changes
+### RecipeListView.swift & RecipeListSplitView.swift
+- `onSave` callback syncs search service immediately after save
+- `onChange(of: recipeStore.recipes)` keeps search index in sync
 
-### How It Works Now
+---
 
-1. **Adding a Recipe:**
-   - User taps Save in RecipeFormView
-   - `RecipeStore.saveNewRecipe()` writes file and appends to `recipes` array
-   - `withAnimation` triggers SwiftUI observation and smooth list animation
-   - Sheet dismisses
-   - `onSave` callback syncs search service
-   - Recipe appears instantly with animation
+## v2 — Background Loading with Progress
 
-2. **External File Changes (iCloud sync, Finder):**
-   - `DispatchSource` detects folder changes
-   - 500ms debounce batches rapid events
-   - `onFilesChanged` callback triggers `RecipeStore.refreshRecipes()`
-   - UI updates with animation
+### Problem
 
-3. **Pull-to-Refresh:**
-   - Still works as manual fallback
-   - Calls `viewModel.refresh()` which scans folder and re-parses
+On first launch with a large iCloud library:
+- `String(contentsOf:)` on an iCloud placeholder file blocks the calling thread until iCloud downloads the content, which can take seconds per file.
+- All files were read before checking the cache, so even unchanged files did full disk I/O.
+- The only loading indicator was an indeterminate spinner — no sense of progress.
+
+### Three-Phase Loading Architecture
+
+`RecipeStore.reloadFromMonitor()` uses three distinct phases to keep all blocking I/O off the main actor and provide real-time progress:
+
+#### Phase 1 — Metadata only (Task.detached)
+For each `.md` file URL, read only:
+- Modification date (`FileManager.attributesOfItem`) — used for cache validation
+- iCloud download status (`url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])`) — used to detect placeholders
+
+No file content is read in this phase. Returns `[(url, modDate, downloadStatus)]` — all `Sendable`.
+
+#### Phase 2 — Cache check + download triggering (main actor, no I/O)
+For each file using the metadata from Phase 1:
+- **Cache hit** (`modDate` matches cached entry): immediately add to results and increment progress.
+- **iCloud placeholder** (`.notDownloaded`): call `FileManager.startDownloadingUbiquitousItem(at:)` to request iOS download it; track in `pendingDownloadURLs`; count toward progress (as "deferred").
+- **Cache miss / stale**: queue for Phase 3.
+
+#### Phase 3 — Concurrent content reads (TaskGroup inside Task.detached)
+Read file content for cache misses **concurrently** using `withTaskGroup`. Each completed read returns `(url, content, modDate)`. Results are handed back to the main actor for the CPU-only RecipeMD parse step. Progress is updated after each file completes.
+
+### Progress State
+
+`RecipeStore` exposes:
+
+```swift
+struct LoadingProgress {
+    let total: Int      // total .md files in the folder
+    let loaded: Int     // cache hits + parsed + deferred (everything settled)
+    var remaining: Int { total - loaded }
+    var fraction: Double { total > 0 ? Double(loaded) / Double(total) : 0 }
+}
+var loadingProgress: LoadingProgress? = nil   // nil when not loading
+var pendingDownloadCount: Int = 0             // files waiting on iCloud
+```
+
+`loadingProgress` is set at the start of `reloadFromMonitor()`, updated incrementally, and cleared when loading finishes.
+
+### UI
+
+In `RecipeListView` and `RecipeListSplitView`:
+- A determinate `ProgressView(value: progress.fraction)` bar replaces the indeterminate spinner during initial load (when the recipe list is still empty).
+- A compact loading banner via `.safeAreaInset(edge: .top)` appears above the list when loading is in progress and some recipes are already visible.
+- When `pendingDownloadCount > 0`, the loading view shows: **"Waiting for iCloud to download N recipe(s)"**
+
+### iCloud Stall Detection
+
+When `reloadFromMonitor()` finishes with `pendingDownloadCount > 0`, a stall timer fires after **15 seconds**. If files are still not downloaded, `startDownloadingUbiquitousItem` is re-called for each pending URL and the timer resets. The timer is cancelled when `refreshRecipes()` runs (meaning iCloud delivered a file and the file monitor fired).
+
+The existing `DispatchSource` in `RecipeFileMonitor` automatically fires `onFilesChanged` when iCloud writes downloaded content to the folder — no polling needed for the happy path.
+
+### Files Modified
+
+| File | Changes |
+|------|---------|
+| `Core/Services/RecipeStore.swift` | `LoadingProgress` struct, `loadingProgress`/`pendingDownloadCount` state, three-phase `reloadFromMonitor()`, stall timer |
+| `Features/RecipeList/Views/RecipeListView.swift` | Determinate progress bar, iCloud waiting label, top banner for in-progress loads |
+| `Features/RecipeList/Views/RecipeListSplitView.swift` | Same |

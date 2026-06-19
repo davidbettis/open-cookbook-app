@@ -31,15 +31,27 @@ final class RecipeFileParser {
             throw RecipeParseError.encodingError
         }
 
+        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let modDate = attributes?[.modificationDate] as? Date
+
+        return try parse(content: content, at: url, modDate: modDate)
+    }
+
+    /// Parse pre-loaded RecipeMD content into a RecipeFile (no file I/O).
+    /// Use this when file contents have already been read off the main actor.
+    /// - Parameters:
+    ///   - content: The raw markdown string
+    ///   - url: The source file URL (used for filePath and ID)
+    ///   - modDate: The file's modification date, if known
+    /// - Returns: A RecipeFile instance with parsed recipe and file metadata
+    /// - Throws: RecipeParseError if parsing fails
+    func parse(content: String, at url: URL, modDate: Date?) throws -> RecipeFile {
         let recipe: Recipe
         do {
             recipe = try parser.parse(content)
         } catch {
             throw RecipeParseError.invalidFormat(reason: error.localizedDescription)
         }
-
-        let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
-        let modDate = attributes?[.modificationDate] as? Date
 
         return RecipeFile(
             filePath: url,

@@ -164,10 +164,10 @@ struct RecipeListSplitView: View {
     @ViewBuilder
     private var sidebarContent: some View {
         Group {
-            if viewModel.recipeStore.isLoading && viewModel.recipeStore.recipes.isEmpty {
-                // Show loading state on initial load
-                ProgressView("Loading recipes...")
-                    .padding()
+            if viewModel.recipeStore.recipes.isEmpty
+                && (viewModel.recipeStore.isLoading || viewModel.recipeStore.pendingDownloadCount > 0) {
+                // Initial load, or waiting on iCloud downloads before any recipe is available
+                libraryLoadingView
             } else if viewModel.recipeStore.recipes.isEmpty && !viewModel.searchService.hasActiveFilters {
                 // Show empty state (no recipes at all)
                 RecipeListEmptyState()
@@ -176,6 +176,22 @@ struct RecipeListSplitView: View {
                 sidebarWithSearch
             }
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if !viewModel.recipeStore.recipes.isEmpty,
+               viewModel.recipeStore.loadingProgress != nil || viewModel.recipeStore.pendingDownloadCount > 0 {
+                RecipeLibraryLoadingBanner(
+                    progress: viewModel.recipeStore.loadingProgress,
+                    pendingDownloadCount: viewModel.recipeStore.pendingDownloadCount
+                )
+            }
+        }
+    }
+
+    private var libraryLoadingView: some View {
+        RecipeLibraryLoadingFullView(
+            progress: viewModel.recipeStore.loadingProgress,
+            pendingDownloadCount: viewModel.recipeStore.pendingDownloadCount
+        )
     }
 
     /// Sidebar with search bar and tag filter
