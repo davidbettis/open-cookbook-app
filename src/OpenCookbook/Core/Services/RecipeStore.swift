@@ -91,6 +91,11 @@ class RecipeStore {
     /// Load recipes from a folder
     /// - Parameter folder: The folder URL containing .md files
     func loadRecipes(from folder: URL) async {
+        // The library container and the list/split view both load on appear, so
+        // this can be called twice for the same folder. A second concurrent pass
+        // duplicates every file read for no benefit, so let the first one finish.
+        guard !isLoading else { return }
+
         isLoading = true
         defer { isLoading = false }
 
@@ -403,66 +408,90 @@ class RecipeStore {
 
     // MARK: - Parsing
 
-    /// Three-phase load: metadata → cache check + iCloud trigger → concurrent reads.
-    /// Each TaskGroup child task runs on the cooperative thread pool; the main actor
-    /// suspends (not blocks) at each `for await`, staying free for UI updates.
+    /// Reload the library from the monitor's current file list, coalescing any
+    /// monitor events that arrive while the pass is running.
     private func reloadFromMonitor() async {
+        await performLoadPass()
+
+        // A monitor event arrived while we were loading — fold it into one more
+        // pass instead of dropping it. `isLoading` is still true here (the
+        // caller's defer hasn't run), so further events keep coalescing. This
+        // loops rather than recursing so a folder that keeps changing during a
+        // long load doesn't grow the async stack without bound.
+        while pendingReload {
+            pendingReload = false
+            fileMonitor.scanFolder()
+            await performLoadPass()
+        }
+
+        scheduleDownloadStallCheck()
+    }
+
+    /// One load pass: resolve each file's metadata and content off the main
+    /// actor, then parse and publish on it.
+    ///
+    /// Reads run through a sliding window rather than one child task per file.
+    /// iCloud-backed files are served by the file provider, and firing a request
+    /// per file at it (77+ for a large library, none of them warm on a first
+    /// launch) both saturates the cooperative thread pool with blocking reads
+    /// and queues work the provider serialises anyway — leaving the progress
+    /// counter pinned at 0 while nothing appears to happen.
+    private func performLoadPass() async {
         let fileURLs = fileMonitor.fileURLs
         loadingProgress = LoadingProgress(total: fileURLs.count, loaded: 0)
 
-        // Phase 1: collect mod dates + iCloud status concurrently (no file content)
-        var fileMetas: [(url: URL, modDate: Date?, isPlaceholder: Bool)] = []
-        await withTaskGroup(of: (URL, Date?, Bool).self) { group in
-            for url in fileURLs {
-                group.addTask {
-                    let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
-                    let modDate = attrs?[.modificationDate] as? Date
-                    let resourceValues = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
-                    let isPlaceholder = resourceValues?.ubiquitousItemDownloadingStatus == .notDownloaded
-                    return (url, modDate, isPlaceholder)
-                }
-            }
-            for await result in group {
-                fileMetas.append(result)
-            }
-        }
+        // Snapshot what the cache was built from. Only the dates cross into the
+        // child tasks, so an unchanged file can be skipped without them
+        // touching main-actor state; the entries themselves stay here.
+        let cacheSnapshot = recipeCache
+        let cachedModDates = cacheSnapshot.mapValues(\.fileModifiedDate)
 
-        // Phase 2: classify files using metadata — no I/O, runs on main actor
         var newRecipes: [RecipeFile] = []
         var newErrors: [URL: Error] = [:]
-        var urlsToRead: [(url: URL, modDate: Date?)] = []
         var newPendingURLs: Set<URL> = []
         var loaded = 0
 
-        for (url, modDate, isPlaceholder) in fileMetas {
-            if isPlaceholder {
-                // iCloud placeholder — request download and count as deferred
-                try? FileManager.default.startDownloadingUbiquitousItem(at: url)
-                newPendingURLs.insert(url)
-                loaded += 1
-            } else if let cached = recipeCache[url], let modDate, cached.fileModifiedDate == modDate {
-                // Cache hit — no I/O needed
-                newRecipes.append(cached)
-                loaded += 1
-            } else {
-                urlsToRead.append((url, modDate))
-            }
-            loadingProgress = LoadingProgress(total: fileURLs.count, loaded: loaded)
-        }
+        await withTaskGroup(of: (URL, Date?, FileLoadOutcome).self) { group in
+            var remaining = fileURLs.makeIterator()
 
-        pendingDownloadURLs = newPendingURLs
-        pendingDownloadCount = newPendingURLs.count
-
-        // Phase 3: read cache-miss content concurrently; parse + update progress as each arrives
-        await withTaskGroup(of: (URL, String?, Date?).self) { group in
-            for (url, modDate) in urlsToRead {
+            func addNext() {
+                guard let url = remaining.next() else { return }
+                let cachedModDate = cachedModDates[url] ?? nil
                 group.addTask {
-                    let content = try? String(contentsOf: url, encoding: .utf8)
-                    return (url, content, modDate)
+                    let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+                    let modDate = attrs?[.modificationDate] as? Date
+
+                    let resourceValues = try? url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
+                    if resourceValues?.ubiquitousItemDownloadingStatus == .notDownloaded {
+                        return (url, modDate, .placeholder)
+                    }
+
+                    if let cachedModDate, let modDate, cachedModDate == modDate {
+                        return (url, modDate, .unchanged)
+                    }
+
+                    guard let content = try? String(contentsOf: url, encoding: .utf8) else {
+                        return (url, modDate, .unreadable)
+                    }
+                    return (url, modDate, .content(content))
                 }
             }
-            for await (url, content, modDate) in group {
-                if let content {
+
+            for _ in 0..<Self.maxConcurrentFileReads { addNext() }
+
+            for await (url, modDate, outcome) in group {
+                switch outcome {
+                case .placeholder:
+                    // iCloud hasn't downloaded this yet — request it and defer.
+                    try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+                    newPendingURLs.insert(url)
+
+                case .unchanged:
+                    if let cached = cacheSnapshot[url] {
+                        newRecipes.append(cached)
+                    }
+
+                case .content(let content):
                     do {
                         let recipeFile = try parser.parse(content: content, at: url, modDate: modDate)
                         recipeCache[url] = recipeFile
@@ -471,13 +500,19 @@ class RecipeStore {
                         recipeCache.removeValue(forKey: url)
                         newErrors[url] = error
                     }
-                } else {
+
+                case .unreadable:
                     newErrors[url] = RecipeParseError.fileNotReadable
                 }
+
                 loaded += 1
                 loadingProgress = LoadingProgress(total: fileURLs.count, loaded: loaded)
+                addNext()
             }
         }
+
+        pendingDownloadURLs = newPendingURLs
+        pendingDownloadCount = newPendingURLs.count
 
         // Evict cache entries for files no longer present in the folder
         let validURLs = Set(fileURLs)
@@ -490,18 +525,6 @@ class RecipeStore {
             parseErrors = newErrors
             loadingProgress = nil
         }
-
-        // A monitor event arrived while we were loading — coalesce it into one
-        // more pass instead of dropping it. `isLoading` is still true here (the
-        // caller's defer hasn't run), so any further events keep coalescing.
-        if pendingReload {
-            pendingReload = false
-            fileMonitor.scanFolder()
-            await reloadFromMonitor()
-            return
-        }
-
-        scheduleDownloadStallCheck()
     }
 
     /// Fires a 15-second timer that re-requests iCloud download for any stalled placeholders.
@@ -528,6 +551,21 @@ class RecipeStore {
 // MARK: - Nested Types
 
 extension RecipeStore {
+    /// Upper bound on file reads in flight at once during a load pass.
+    static let maxConcurrentFileReads = 8
+
+    /// What a load pass established about a single file, off the main actor.
+    enum FileLoadOutcome: Sendable {
+        /// iCloud has not downloaded the file's content yet.
+        case placeholder
+        /// Modification date matches the cached entry — reuse it, no read needed.
+        case unchanged
+        /// Freshly read markdown, still to be parsed.
+        case content(String)
+        /// The file exists but its content could not be read.
+        case unreadable
+    }
+
     struct LoadingProgress {
         let total: Int
         let loaded: Int

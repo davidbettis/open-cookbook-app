@@ -96,11 +96,6 @@ class RecipeListViewModel {
 
     // MARK: - Methods
 
-    func loadRecipes(folder: URL) async {
-        await recipeStore.loadRecipes(from: folder)
-        searchService.updateRecipes(recipeStore.recipes)
-    }
-
     func refresh() async {
         isRefreshing = true
         await recipeStore.refreshRecipes()
@@ -293,12 +288,6 @@ struct RecipeListView: View {
                 )
             }
             .toast(isPresented: $showToast, message: toastMessage, style: toastStyle)
-            .task {
-                // Load recipes on appear
-                if let folder = folderManager.selectedFolderURL {
-                    await viewModel.loadRecipes(folder: folder)
-                }
-            }
             .onChange(of: viewModel.recipeStore.recipes) { _, _ in
                 viewModel.syncSearchService()
             }

@@ -76,12 +76,6 @@ struct RecipeListSplitView: View {
         } message: { error in
             Text(error.1.localizedDescription)
         }
-        .task {
-            // Load recipes on appear
-            if let folder = folderManager.selectedFolderURL {
-                await viewModel.loadRecipes(folder: folder)
-            }
-        }
         .onChange(of: viewModel.recipeStore.recipes) { _, _ in
             viewModel.syncSearchService()
         }

@@ -40,6 +40,17 @@ class RecipeFileMonitor {
     /// Start monitoring a folder for changes
     /// - Parameter folder: The folder URL to monitor
     func startMonitoring(folder: URL) {
+        // Already watching this folder — just re-scan. Tearing down a live
+        // source and immediately rebuilding it is unsafe: `cancel()` closes the
+        // descriptor asynchronously, `open()` hands the same number straight
+        // back, and the stale cancel handler then closes the new source's
+        // descriptor. Callers do re-enter here (the library container and the
+        // list view both load on appear).
+        if monitoredFolder == folder, folderSource != nil {
+            scanFolder()
+            return
+        }
+
         // Stop any existing monitoring
         stopMonitoring()
 
@@ -56,15 +67,12 @@ class RecipeFileMonitor {
         debounceTask?.cancel()
         debounceTask = nil
 
-        // Stop the dispatch source
+        // Stop the dispatch source. Its cancel handler owns the descriptor and
+        // closes it; closing here as well would risk closing a descriptor that
+        // `open()` has already handed out to a newer source.
         folderSource?.cancel()
         folderSource = nil
-
-        // Close the file descriptor
-        if folderDescriptor >= 0 {
-            close(folderDescriptor)
-            folderDescriptor = -1
-        }
+        folderDescriptor = -1
 
         monitoredFolder = nil
         fileURLs = []
@@ -111,22 +119,24 @@ class RecipeFileMonitor {
         let didStartAccess = folder.startAccessingSecurityScopedResource()
 
         // Open the folder for monitoring
-        folderDescriptor = open(folder.path, O_EVTONLY)
+        let descriptor = open(folder.path, O_EVTONLY)
 
         if didStartAccess {
             folder.stopAccessingSecurityScopedResource()
         }
 
-        guard folderDescriptor >= 0 else {
+        guard descriptor >= 0 else {
             #if DEBUG
             print("[RecipeFileMonitor] Failed to open folder for monitoring")
             #endif
             return
         }
 
+        folderDescriptor = descriptor
+
         // Create dispatch source for file system events
         let source = DispatchSource.makeFileSystemObjectSource(
-            fileDescriptor: folderDescriptor,
+            fileDescriptor: descriptor,
             eventMask: [.write, .delete, .rename, .extend],
             queue: .main
         )
@@ -135,12 +145,11 @@ class RecipeFileMonitor {
             self?.handleFolderChange()
         }
 
-        source.setCancelHandler { [weak self] in
-            guard let self else { return }
-            if self.folderDescriptor >= 0 {
-                close(self.folderDescriptor)
-                self.folderDescriptor = -1
-            }
+        // Capture the descriptor by value: this handler owns exactly the one it
+        // was created with, never whatever `folderDescriptor` happens to hold
+        // by the time the cancellation is delivered.
+        source.setCancelHandler {
+            close(descriptor)
         }
 
         source.resume()
