@@ -1,5 +1,9 @@
 # Release History
 
+1.0.9
+- bug: library could hang on "Loading 0 of N recipes..." at launch, most often on Mac with a large iCloud folder
+- bug: library stopped noticing recipes added, changed, or removed outside the app
+
 1.0.8
 - bug: app won't startup with large libraries. refresh the library based on filesystem events, don't block at startup
 - allow copying parts of of the recipe in the detail view
